@@ -4,9 +4,9 @@ for key, value of require('./apnshit/common')
 module.exports = class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @current_id   = 0
     @Notification = require './apnshit/notification'
-
+    @current_id   = 0
+    
     @options = {
       cert              : 'cert.pem',
       certData          : null,
@@ -25,66 +25,42 @@ module.exports = class Apnshit extends EventEmitter
       autoAdjustCache   : true,
       connectionTimeout : 0
     }
+
     _.extend @options, options
 
   connect: ->
-    @loadKeys().then(
-      =>
-        options = {}
+    @defer (resolve, reject) =>
+      if @socket && @socket.writable
+        resolve()
+      else
+        socket_options =
+          ca                : @options.ca
+          cert              : fs.readFileSync(@options.cert)
+          key               : fs.readFileSync(@options.key)
+          passphrase        : @options.passphrase
+          rejectUnauthorized: @options.rejectUnauthorized
+          socket            : new net.Stream()
 
-        if @pfxData
-          options.pfx  = @pfxData
-        else
-          options.key  = @keyData
-          options.cert = @certData
-          options.ca   = @options.ca
+        @socket = tls.connect @options.port, @options.gateway, socket_options, =>
+          @emit("connect")
+          resolve()
         
-        options.passphrase         = @options.passphrase
-        options.rejectUnauthorized = @options.rejectUnauthorized
-        options.socket             = new net.Stream()
+        @socket.setNoDelay false
+        @socket.setTimeout @options.connectionTimeout
         
-        @socketConnect(options)
-    )
+        @socket.on "error", @socketError
+        @socket.on "timeout", @socketTimeout
+        @socket.on "data", @socketData
+        @socket.on "drain", @socketDrain
+        @socket.on "clientError", @socketClientError
+        @socket.on "close", @socketClose
+        
+        @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
     d = Q.defer()
     fn(d.resolve, d.reject)
     d.promise
-
-  loadKeys: ->
-    @defer (resolve, reject) =>
-      if @options.pfx? or @options.pfxData?
-        if @options.pfxData
-          @pfxData = @options.pfxData
-          resolve()
-        else
-          fs.readFile @options.pfx, (err, data) =>
-            if err
-              reject(err)
-            else
-              @pfxData = data
-              resolve()
-      else
-        if @options.certData
-          @certData = @options.certData
-          resolve()
-        else
-          fs.readFile @options.cert, (err, data) =>
-            if err
-              reject(err)
-            else
-              @certData = data.toString()
-              resolve()
-        if @options.keyData
-          @keyData = @options.keyData
-          resolve()
-        else
-          fs.readFile @options.key, (err, data) =>
-            if err
-              reject(err)
-            else
-              @keyData = data.toString()
-              resolve()
 
   send: (notification) ->
     data           = undefined
@@ -122,24 +98,6 @@ module.exports = class Apnshit extends EventEmitter
 
         @socket.write(data)
     ).done()
-
-  socketConnect: (options) ->
-    @defer (resolve, reject) =>
-      @socket = tls.connect @options.port, @options.gateway, options, =>
-        @emit("connect")
-        resolve()
-      
-      @socket.setNoDelay false
-      @socket.setTimeout @options.connectionTimeout
-      
-      @socket.on "error", @socketError
-      @socket.on "timeout", @socketTimeout
-      @socket.on "data", @socketData
-      @socket.on "drain", @socketDrain
-      @socket.on "clientError", @socketClientError
-      @socket.on "close", @socketClose
-      
-      @socket.socket.connect @options.port, @options.gateway
 
   socketData: ->
     console.log("socket data")
