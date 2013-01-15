@@ -5,9 +5,9 @@
 		"node-template": "./bin/node-template"
 	},
 	"dependencies": {
-		"async": "",
 		"colors": "",
 		"glob": "",
+		"q": "",
 		"underscore": ""
 	},
 	"devDependencies": {
@@ -19,6 +19,6 @@
 	"preferGlobal": "true",
 	"scripts": {
 		"start": "coffee -o lib -cw src",
-		"test": "mocha test/test.js --reporter spec"
+		"test": "mocha test/test.js --reporter spec -t 10000"
 	}
 }
