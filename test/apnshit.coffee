@@ -1,3 +1,5 @@
+# Winton device id - 91c5edb38fff5524370350b3e686e303f835d2a27967fed5b53f8c63513ae132
+
 Apnshit = require('../lib/apnshit')
 apns = null
 

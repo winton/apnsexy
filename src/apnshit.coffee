@@ -4,17 +4,14 @@ for key, value of require('./apnshit/common')
 module.exports = class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @Notification = require './apnshit/notification'
+    @buffer       = []
     @current_id   = 0
+    @Notification = require './apnshit/notification'
     
-    @options = {
+    @options =
       cert              : 'cert.pem',
-      certData          : null,
       key               : 'key.pem',
-      keyData           : null,
       ca                : null,
-      pfx               : null,
-      pfxData           : null,
       passphrase        : null,
       gateway           : 'gateway.push.apple.com',
       port              : 2195,
@@ -24,7 +21,6 @@ module.exports = class Apnshit extends EventEmitter
       cacheLength       : 100,
       autoAdjustCache   : true,
       connectionTimeout : 0
-    }
 
     _.extend @options, options
 
@@ -48,12 +44,12 @@ module.exports = class Apnshit extends EventEmitter
         @socket.setNoDelay false
         @socket.setTimeout @options.connectionTimeout
         
-        @socket.on "error", @socketError
-        @socket.on "timeout", @socketTimeout
-        @socket.on "data", @socketData
-        @socket.on "drain", @socketDrain
-        @socket.on "clientError", @socketClientError
-        @socket.on "close", @socketClose
+        @socket.on "error",       => @socketError
+        @socket.on "timeout",     => @socketTimeout
+        @socket.on "data", (data) => @socketData(data)
+        @socket.on "drain",       => @socketDrain
+        @socket.on "clientError", => @socketClientError
+        @socket.on "close",       => @socketClose
         
         @socket.socket.connect @options.port, @options.gateway
 
@@ -74,6 +70,10 @@ module.exports = class Apnshit extends EventEmitter
       =>
         notification._uid = @current_id++
         @current_id = 0  if @current_id > 0xffffffff
+
+        if @socketUnavailable()
+          @buffer.push(notification)
+          return
 
         if @options.enhanced
           data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
@@ -97,22 +97,31 @@ module.exports = class Apnshit extends EventEmitter
         position += data.write(message, position, encoding)
 
         @socket.write(data)
+        @socketDrain()
     ).done()
 
-  socketData: ->
-    console.log("socket data")
+  socketData: (data) ->
+    if data[0] == 8
+      error_code = data[1]
+      identifier = data.readUInt32BE(2)
+      console.log("notification failed:", identifier)
 
   socketDrain: ->
-    console.log("socket drain")
+    return if @socketUnavailable()
+    @send(@buffer.shift())  if @buffer.length
   
   socketError: ->
-    console.log("socket error")
+    delete @socket
 
   socketClientError: ->
-    console.log("socket client error")
+    delete @socket
   
   socketClose: ->
-    console.log("socket close")
+    delete @socket
+    @send(@buffer.shift())  if @buffer.length
   
   socketTimeout: ->
-    console.log("socket timeout")
+    delete @socket
+
+  socketUnavailable: ->
+    !@socket || @socket.socket.bufferSize isnt 0 || !@socket.writable
