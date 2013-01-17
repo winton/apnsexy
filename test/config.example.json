@@ -1,0 +1,5 @@
+{
+	"cert": "/Users/wintonwelsh/Sites/namtar/config/apns-development.pem",
+	"key": "/Users/wintonwelsh/Sites/namtar/config/apns-development.pem",
+	"device_id": "91c5edb38fff5524370350b3e686e303f835d2a27967fed5b53f8c6351000000"
+}

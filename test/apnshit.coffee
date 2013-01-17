@@ -1,14 +1,35 @@
-# Winton device id - 91c5edb38fff5524370350b3e686e303f835d2a27967fed5b53f8c63513ae132
-
 Apnshit = require('../lib/apnshit')
-apns = null
+fs = require('fs')
+
+apns          = null
+config        = null
+device_id     = null
+notifications = []
+
+notification = (bad = false) ->
+  noti = new apns.Notification()
+  noti.alert =
+    "#{
+      if bad then "Bad" else "Good"
+    } notification: #{
+      ((new Date).getTime() + '').substr(-4)
+    }"
+  noti.badge = 0
+  noti.sound = 'default'
+  if bad
+    noti.device = "0#{config.device_id.substr(1)}"
+  else
+    noti.device = config.device_id
+  noti
 
 describe 'Apnshit', ->
 
   before ->
-    apns = new Apnshit(
-      "cert": "/Users/wintonwelsh/Sites/namtar/config/apns-development.pem"
-      "key": "/Users/wintonwelsh/Sites/namtar/config/apns-development.pem"
+    config = fs.readFileSync("#{__dirname}/config.json")
+    config = JSON.parse(config)
+    apns   = new Apnshit(
+      "cert": config.cert
+      "key": config.key
       "gateway": "gateway.sandbox.push.apple.com"
       "port": "2195"
       "enhanced": true
@@ -20,10 +41,22 @@ describe 'Apnshit', ->
       apns.connect().then(-> done())
 
   describe '#send()', ->
-    it 'should', (done) ->
-      noti = new apns.Notification()
-      noti.alert = "This is a test"
-      noti.badge = 0
-      noti.sound = 'default'
-      noti.device = '91c5edb38fff5524370350b3e686e303f835d2a27967fed5b53f8c63513ae132'
-      apns.send(noti)
+    it 'should send a notification', (done) ->
+      apns.send(notification()).then(
+        (n) ->
+          notifications.push(n)
+          done()
+      )
+
+    it 'should recover from failure', (done) ->
+      apns.send(notification(true))
+      apns.send(notification()).then(
+        (n) ->
+          notifications.push(n)
+          done()
+      )
+
+  describe 'verify notifications', ->
+    it 'should have sent these notifications', (done) ->
+      for n in notifications
+        console.log("\n#{n.alert}")

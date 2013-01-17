@@ -4,9 +4,9 @@ for key, value of require('./apnshit/common')
 module.exports = class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @buffer       = []
-    @current_id   = 0
-    @Notification = require './apnshit/notification'
+    @current_id          = 0
+    @Notification        = require './apnshit/notification'
+    @not_sure_if_sent = []
     
     @options =
       cert              : 'cert.pem',
@@ -71,10 +71,6 @@ module.exports = class Apnshit extends EventEmitter
         notification._uid = @current_id++
         @current_id = 0  if @current_id > 0xffffffff
 
-        if @socketUnavailable()
-          @buffer.push(notification)
-          return
-
         if @options.enhanced
           data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
           data[position] = 1
@@ -96,32 +92,59 @@ module.exports = class Apnshit extends EventEmitter
         position += 2
         position += data.write(message, position, encoding)
 
-        @socket.write(data)
-        @socketDrain()
-    ).done()
+        @not_sure_if_sent.push(notification)
+
+        @defer (resolve, reject) =>
+          console.log("write: ", notification.alert)
+          @socket.write data, encoding, =>
+            console.log("finished write @not_sure_if_sent: ", @inspect(@not_sure_if_sent))
+            resolve(notification)
+    )
 
   socketData: (data) ->
     if data[0] == 8
       error_code = data[1]
       identifier = data.readUInt32BE(2)
-      console.log("notification failed:", identifier)
+
+      console.log("notification failed: ", identifier)
+      console.log("@not_sure_if_sent: ", @inspect(@not_sure_if_sent))
+
+      notification = _.find @not_sure_if_sent, (item, i) =>
+        item._uid == identifier
+        
+      if notification
+        console.log("notification match: ", notification.alert)
+
+        resend = @not_sure_if_sent.slice(
+          index = @not_sure_if_sent.indexOf(notification) + 1
+        )
+
+        @not_sure_if_sent = []
+        delete @socket # why do I have to do this?
+        
+        _.each resend, (item) =>
+          console.log("retrying: ", item.alert)
+          @send(item)
+
+  inspect: (arr) ->
+    output = _.map arr, (item) -> item.alert
+    "[ #{output.join(',')} ]"
 
   socketDrain: ->
-    return if @socketUnavailable()
-    @send(@buffer.shift())  if @buffer.length
+    console.log('drain')
   
   socketError: ->
+    console.log('error')
     delete @socket
 
   socketClientError: ->
+    console.log('client error')
     delete @socket
   
   socketClose: ->
+    console.log('socket close')
     delete @socket
-    @send(@buffer.shift())  if @buffer.length
   
   socketTimeout: ->
+    console.log('socket timeout')
     delete @socket
-
-  socketUnavailable: ->
-    !@socket || @socket.socket.bufferSize isnt 0 || !@socket.writable
