@@ -4,8 +4,8 @@ for key, value of require('./apnshit/common')
 module.exports = class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @current_id          = 0
-    @Notification        = require './apnshit/notification'
+    @current_id       = 0
+    @Notification     = require './apnshit/notification'
     @not_sure_if_sent = []
     
     @options =
