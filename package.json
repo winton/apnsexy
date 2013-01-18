@@ -13,6 +13,7 @@
 		"mocha": "",
 		"sinon": ""
 	},
+	"main": "./lib/apnshit",
 	"preferGlobal": "true",
 	"scripts": {
 		"start": "coffee -o lib -cw src",

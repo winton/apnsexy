@@ -113,10 +113,11 @@ module.exports = class Apnshit extends EventEmitter
         item._uid == identifier
         
       if notification
+        @emit('error', notification)
         console.log("notification match: ", notification.alert)
 
         resend = @not_sure_if_sent.slice(
-          index = @not_sure_if_sent.indexOf(notification) + 1
+          @not_sure_if_sent.indexOf(notification) + 1
         )
 
         @not_sure_if_sent = []
