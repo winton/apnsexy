@@ -44,6 +44,8 @@ module.exports = class Apnshit extends EventEmitter
         @socket.setNoDelay false
         @socket.setTimeout @options.connectionTimeout
         
+        @on "error", ->
+
         @socket.on "error",       => @socketError
         @socket.on "timeout",     => @socketTimeout
         @socket.on "data", (data) => @socketData(data)
