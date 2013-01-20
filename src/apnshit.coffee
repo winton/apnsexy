@@ -46,10 +46,8 @@ module.exports = class Apnshit extends EventEmitter
     else
       @connect_promise = @defer (resolve, reject) =>
         if @socket && @socket.writable
-          console.log("no need to reconnect!")
           resolve()
         else
-          console.log("reconnect!")
           @connecting = true
           socket_options =
             ca                : @options.ca
@@ -123,7 +121,6 @@ module.exports = class Apnshit extends EventEmitter
         @not_sure_if_sent.push(notification)
 
         @defer (resolve, reject) =>
-          console.log("write: ", notification.alert)
           @socket.write data, encoding, =>
             resolve(notification)
     )
@@ -137,9 +134,6 @@ module.exports = class Apnshit extends EventEmitter
         item._uid == identifier
         
       if notification
-        console.log("failed: ", notification.alert)
-        console.log("@not_sure_if_sent: ", @inspect(@not_sure_if_sent))
-
         @emit('error', notification)
 
         resend = @not_sure_if_sent.slice(
@@ -150,7 +144,6 @@ module.exports = class Apnshit extends EventEmitter
         @disconnect()
         
         for item in resend
-          console.log("resend: ", item.alert)
           @send(item)
 
   inspect: (arr) ->
