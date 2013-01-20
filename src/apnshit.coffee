@@ -7,6 +7,8 @@ module.exports = class Apnshit extends EventEmitter
     @current_id       = 0
     @Notification     = require './apnshit/notification'
     @not_sure_if_sent = []
+
+    @on "error", ->
     
     @options =
       cert              : 'cert.pem',
@@ -24,41 +26,65 @@ module.exports = class Apnshit extends EventEmitter
 
     _.extend @options, options
 
+  finished: =>
+    @finished ||= 0
+    setTimeout(
+      =>
+        @finished += 1
+        if @finished >= 5 || !@socket.bufferSize
+          @disconnect()
+          @finished = 0
+          @emit('done')
+        else
+          @checkIfDone()
+      5000
+    )
+
   connect: ->
-    @defer (resolve, reject) =>
-      if @socket && @socket.writable
-        resolve()
-      else
-        socket_options =
-          ca                : @options.ca
-          cert              : fs.readFileSync(@options.cert)
-          key               : fs.readFileSync(@options.key)
-          passphrase        : @options.passphrase
-          rejectUnauthorized: @options.rejectUnauthorized
-          socket            : new net.Stream()
-
-        @socket = tls.connect @options.port, @options.gateway, socket_options, =>
-          @emit("connect")
+    if @connecting
+      @connect_promise
+    else
+      @connect_promise = @defer (resolve, reject) =>
+        if @socket && @socket.writable
+          console.log("no need to reconnect!")
           resolve()
-        
-        @socket.setNoDelay false
-        @socket.setTimeout @options.connectionTimeout
-        
-        @on "error", ->
+        else
+          console.log("reconnect!")
+          @connecting = true
+          socket_options =
+            ca                : @options.ca
+            cert              : fs.readFileSync(@options.cert)
+            key               : fs.readFileSync(@options.key)
+            passphrase        : @options.passphrase
+            rejectUnauthorized: @options.rejectUnauthorized
+            socket            : new net.Stream()
 
-        @socket.on "error",       => @socketError
-        @socket.on "timeout",     => @socketTimeout
-        @socket.on "data", (data) => @socketData(data)
-        @socket.on "drain",       => @socketDrain
-        @socket.on "clientError", => @socketClientError
-        @socket.on "close",       => @socketClose
-        
-        @socket.socket.connect @options.port, @options.gateway
+          @socket = tls.connect @options.port, @options.gateway, socket_options, =>
+            resolve()
+            @connecting = false
+            @emit("connect")
+          
+          @socket.setNoDelay false
+          @socket.setTimeout @options.connectionTimeout
+
+          @socket.on "error",       => @socketError
+          @socket.on "timeout",     => @socketTimeout
+          @socket.on "data", (data) => @socketData(data)
+          @socket.on "drain",       => @socketDrain
+          @socket.on "clientError", => @socketClientError
+          @socket.on "close",       => @socketClose
+
+          @socket.setTimeout(5000, @finished)
+          @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
     d = Q.defer()
     fn(d.resolve, d.reject)
     d.promise
+
+  disconnect: ->
+    @socket.destroy()
+    delete @socket
 
   send: (notification) ->
     data           = undefined
@@ -99,7 +125,6 @@ module.exports = class Apnshit extends EventEmitter
         @defer (resolve, reject) =>
           console.log("write: ", notification.alert)
           @socket.write data, encoding, =>
-            console.log("finished write @not_sure_if_sent: ", @inspect(@not_sure_if_sent))
             resolve(notification)
     )
 
@@ -108,25 +133,24 @@ module.exports = class Apnshit extends EventEmitter
       error_code = data[1]
       identifier = data.readUInt32BE(2)
 
-      console.log("notification failed: ", identifier)
-      console.log("@not_sure_if_sent: ", @inspect(@not_sure_if_sent))
-
       notification = _.find @not_sure_if_sent, (item, i) =>
         item._uid == identifier
         
       if notification
+        console.log("failed: ", notification.alert)
+        console.log("@not_sure_if_sent: ", @inspect(@not_sure_if_sent))
+
         @emit('error', notification)
-        console.log("notification match: ", notification.alert)
 
         resend = @not_sure_if_sent.slice(
           @not_sure_if_sent.indexOf(notification) + 1
         )
 
         @not_sure_if_sent = []
-        delete @socket # why do I have to do this?
+        @disconnect()
         
-        _.each resend, (item) =>
-          console.log("retrying: ", item.alert)
+        for item in resend
+          console.log("resend: ", item.alert)
           @send(item)
 
   inspect: (arr) ->
@@ -134,14 +158,14 @@ module.exports = class Apnshit extends EventEmitter
     "[ #{output.join(',')} ]"
 
   socketDrain: ->
-    console.log('drain')
+    console.log('socket drain')
   
   socketError: ->
-    console.log('error')
+    console.log('socket error')
     delete @socket
 
   socketClientError: ->
-    console.log('client error')
+    console.log('socket client error')
     delete @socket
   
   socketClose: ->

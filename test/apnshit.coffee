@@ -49,14 +49,19 @@ describe 'Apnshit', ->
       )
 
     it 'should recover from failure', (done) ->
-      apns.send(notification(true))
-      apns.send(notification()).then(
-        (n) ->
-          notifications.push(n)
-          done()
+      apns.send(notification(true)).then(
+        => apns.send(notification(true))
+      ).then(
+        => apns.send(notification(true))
+      ).then(
+        => apns.send(notification())
+      ).then(
+        (n) -> notifications.push(n)
       )
+      apns.on 'done', => done()
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
       for n in notifications
         console.log("\n#{n.alert}")
+      done()
