@@ -12,7 +12,7 @@ notification = (bad = false) ->
     "#{
       if bad then "Bad" else "Good"
     } notification: #{
-      ((new Date).getTime() + '').substr(-4)
+      Math.floor(Math.random()*1000)
     }"
   noti.badge = 0
   noti.sound = 'default'
@@ -28,12 +28,11 @@ describe 'Apnshit', ->
     config = fs.readFileSync("#{__dirname}/config.json")
     config = JSON.parse(config)
     apns   = new Apnshit(
-      "cert": config.cert
-      "key": config.key
-      "gateway": "gateway.sandbox.push.apple.com"
-      "port": "2195"
-      "enhanced": true
-      "cacheLength": "1000"
+      cert   : config.cert
+      key    : config.key
+      gateway: "gateway.sandbox.push.apple.com"
+      port   : 2195
+      timeout: 1000
     )
 
   describe '#connect()', ->
@@ -49,16 +48,23 @@ describe 'Apnshit', ->
       )
 
     it 'should recover from failure', (done) ->
-      apns.send(notification(true)).then(
-        => apns.send(notification(true))
-      ).then(
-        => apns.send(notification(true))
-      ).then(
+      errors = 0
+      promise = apns.send(notification(true))
+      for i in [0..8]
+        promise.then(
+          => apns.send(notification(true))
+        )
+      promise.then(
         => apns.send(notification())
       ).then(
         (n) -> notifications.push(n)
       )
-      apns.on 'done', => done()
+      apns.on 'error', (n) =>
+        errors += 1
+        process.stdout.write('.')
+      apns.on 'done', =>
+        errors.should.equal(10)
+        done()
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->

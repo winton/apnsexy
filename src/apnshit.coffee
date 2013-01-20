@@ -11,18 +11,15 @@ module.exports = class Apnshit extends EventEmitter
     @on "error", ->
     
     @options =
-      cert              : 'cert.pem',
-      key               : 'key.pem',
-      ca                : null,
-      passphrase        : null,
-      gateway           : 'gateway.push.apple.com',
-      port              : 2195,
-      rejectUnauthorized: true,
-      enhanced          : true,
-      errorCallback     : undefined,
-      cacheLength       : 100,
-      autoAdjustCache   : true,
-      connectionTimeout : 0
+      ca                : null
+      cert              : 'cert.pem'
+      enhanced          : true
+      gateway           : 'gateway.push.apple.com'
+      key               : 'key.pem'
+      passphrase        : null
+      port              : 2195
+      timeout           : 5000
+      rejectUnauthorized: true
 
     _.extend @options, options
 
@@ -37,7 +34,7 @@ module.exports = class Apnshit extends EventEmitter
           @emit('done')
         else
           @checkIfDone()
-      5000
+      @options.timeout
     )
 
   connect: ->
@@ -61,9 +58,6 @@ module.exports = class Apnshit extends EventEmitter
             resolve()
             @connecting = false
             @emit("connect")
-          
-          @socket.setNoDelay false
-          @socket.setTimeout @options.connectionTimeout
 
           @socket.on "error",       => @socketError
           @socket.on "timeout",     => @socketTimeout
@@ -72,7 +66,8 @@ module.exports = class Apnshit extends EventEmitter
           @socket.on "clientError", => @socketClientError
           @socket.on "close",       => @socketClose
 
-          @socket.setTimeout(5000, @finished)
+          @socket.setNoDelay(false)
+          @socket.setTimeout(@options.timeout, @finished)
           @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
