@@ -4,9 +4,7 @@ for key, value of require('./apnshit/common')
 module.exports = class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @current_id       = 0
-    @Notification     = require './apnshit/notification'
-    @not_sure_if_sent = []
+    @Notification = require './apnshit/notification'
 
     @on "error", ->
     
@@ -18,68 +16,95 @@ module.exports = class Apnshit extends EventEmitter
       key               : 'key.pem'
       passphrase        : null
       port              : 2195
+      resend_on_drop    : false
       timeout           : 5000
       rejectUnauthorized: true
 
     _.extend @options, options
 
-  finished: =>
-    @finished ||= 0
-    setTimeout(
-      =>
-        @finished += 1
-        if @finished >= 5 || !@socket.bufferSize
-          @disconnect()
-          @finished = 0
-          @emit('done')
-        else
-          @checkIfDone()
-      @options.timeout
-    )
-
   connect: ->
-    if @connecting
-      @connect_promise
-    else
-      @connect_promise = @defer (resolve, reject) =>
-        if @socket && @socket.writable
+    console.log('connect @connect_promise', @connect_promise)
+    @connect_promise ||= @defer (resolve, reject) =>
+      if @socket && @socket.writable
+        console.log('connection exists')
+        resolve()
+      else
+        console.log('connecting!')
+        @connecting = true
+        socket_options =
+          ca                : @options.ca
+          cert              : fs.readFileSync(@options.cert)
+          key               : fs.readFileSync(@options.key)
+          passphrase        : @options.passphrase
+          rejectUnauthorized: @options.rejectUnauthorized
+          socket            : new net.Stream()
+
+        @socket = tls.connect @options.port, @options.gateway, socket_options, =>
           resolve()
-        else
-          @connecting = true
-          socket_options =
-            ca                : @options.ca
-            cert              : fs.readFileSync(@options.cert)
-            key               : fs.readFileSync(@options.key)
-            passphrase        : @options.passphrase
-            rejectUnauthorized: @options.rejectUnauthorized
-            socket            : new net.Stream()
+          delete @connect_promise
+          @emit("connect")
+          @watchForStaleSocket()
+          console.log('connected!')
 
-          @socket = tls.connect @options.port, @options.gateway, socket_options, =>
-            resolve()
-            @connecting = false
-            @emit("connect")
+        @socket.on "end",         => @socketEnd
+        @socket.on "error",       => @socketError
+        @socket.on "timeout",     => @socketTimeout
+        @socket.on "data", (data) => @socketData(data)
+        @socket.on "drain",       => @socketDrain
+        @socket.on "clientError", => @socketClientError
+        @socket.on "close",       => @socketClose
 
-          @socket.on "error",       => @socketError
-          @socket.on "timeout",     => @socketTimeout
-          @socket.on "data", (data) => @socketData(data)
-          @socket.on "drain",       => @socketDrain
-          @socket.on "clientError", => @socketClientError
-          @socket.on "close",       => @socketClose
-
-          @socket.setNoDelay(false)
-          @socket.setTimeout(@options.timeout, @finished)
-          @socket.socket.connect @options.port, @options.gateway
+        # @socket.setKeepAlive(true)
+        @socket.setNoDelay(false)
+        # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
+        @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
     d = Q.defer()
     fn(d.resolve, d.reject)
     d.promise
 
-  disconnect: ->
+  disconnect: (options = {}) ->
+    console.log('disconnect')
+
+    delete @bad_alert_sent
+    delete @bytes_read
+    delete @bytes_written
+    delete @connect_promise
+
     @socket.destroy()
     delete @socket
 
+    if options.drop
+      drop = (
+        @options.resend_on_drop &&
+        @not_sure_if_sent &&
+        @not_sure_if_sent.length
+      )
+      console.log(
+        "drop @not_sure_if_sent.length"
+        if @not_sure_if_sent.length then @not_sure_if_sent.length else 0
+      )
+      if drop
+        resend = @not_sure_if_sent.slice()
+        @not_sure_if_sent = []
+        
+        console.log('drop resend', @inspect(resend))
+        console.log('drop resend.length', resend.length)
+
+        for item in resend
+          @send(item)
+      else
+        @emit('done')
+    else
+      @not_sure_if_sent = []
+
+    clearInterval(@interval) if @interval
+
   send: (notification) ->
+    @current_id       ||= 0
+    @not_sure_if_sent ||= []
+
     data           = undefined
     encoding       = notification.encoding || "utf8"
     message        = JSON.stringify(notification)
@@ -116,30 +141,39 @@ module.exports = class Apnshit extends EventEmitter
         @not_sure_if_sent.push(notification)
 
         @defer (resolve, reject) =>
+          console.log('write', notification.alert)
           @socket.write data, encoding, =>
             resolve(notification)
     )
 
   socketData: (data) ->
+    console.log('socketData', data[0])
     if data[0] == 8
       error_code = data[1]
       identifier = data.readUInt32BE(2)
 
       notification = _.find @not_sure_if_sent, (item, i) =>
         item._uid == identifier
-        
+      
       if notification
-        @emit('error', notification)
+        if notification.alert == 'x'
+          @emit('done')  
+        else
+          console.log('error', notification.alert)
+          @emit('error', notification)
 
-        resend = @not_sure_if_sent.slice(
-          @not_sure_if_sent.indexOf(notification) + 1
-        )
+          resend = @not_sure_if_sent.slice(
+            @not_sure_if_sent.indexOf(notification) + 1
+          )
 
-        @not_sure_if_sent = []
-        @disconnect()
-        
-        for item in resend
-          @send(item)
+          @disconnect(drop: @bad_alert_sent)
+
+          console.log('resend', @inspect(resend))
+          console.log('resend.length', resend.length)
+          
+          for item in resend
+            # console.log('resend', item.alert)
+            @send(item)
 
   inspect: (arr) ->
     output = _.map arr, (item) -> item.alert
@@ -148,18 +182,71 @@ module.exports = class Apnshit extends EventEmitter
   socketDrain: ->
     console.log('socket drain')
   
+  socketEnd: ->
+    console.log('socket end')
+    @disconnect()
+
   socketError: ->
     console.log('socket error')
-    delete @socket
+    @disconnect()
 
   socketClientError: ->
     console.log('socket client error')
-    delete @socket
+    @disconnect()
   
   socketClose: ->
     console.log('socket close')
-    delete @socket
+    @disconnect()
   
   socketTimeout: ->
     console.log('socket timeout')
-    delete @socket
+    @disconnect()
+
+  watchForStaleSocket: =>
+    console.log('watchForStaleSocket')
+
+    clearInterval(@interval) if @interval
+    @interval = setInterval(
+      =>
+        console.log('setInterval')
+        console.log('socket?', if @socket then 'true' else 'false')
+        console.log("@socket.writable", @socket.writable) if @socket
+
+        if @socket && !@socket.writable
+          @disconnect(drop: true)
+          return
+
+        return unless @socket && @socket.writable
+
+        stale = (
+          @socket.bytesRead    == @bytes_read &&
+          @socket.bytesWritten == @bytes_written
+        )
+
+        console.log("stale", stale)
+
+        if stale
+          if @bad_alert_sent
+            console.log("bad alert not responded to")
+            @disconnect(drop: true)
+          else
+            console.log("sending bad alert!")
+
+            noti = new @Notification()
+            noti.alert  = "x"
+            noti.badge  = 0
+            noti.sound  = 'default'
+            noti.device = Array(32).join("a0")
+
+            @bad_alert_sent = true
+            @send(noti)
+
+        if @socket
+          @bytes_read    = @socket.bytesRead
+          @bytes_written = @socket.bytesWritten
+        else
+          delete @bytes_read
+          delete @bytes_written
+
+      @options.timeout
+    )

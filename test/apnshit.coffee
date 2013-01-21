@@ -12,12 +12,16 @@ notification = (bad = false) ->
     "#{
       if bad then "Bad" else "Good"
     } notification: #{
-      Math.floor(Math.random()*1000)
+      Math.floor(Math.random()*10000)
     }"
   noti.badge = 0
   noti.sound = 'default'
   if bad
-    noti.device = "0#{config.device_id.substr(1)}"
+    noti.device = "#{
+      Math.floor(Math.random() * (99999 - 10000 + 1)) + 10000
+    }#{
+      config.device_id.substr(5)
+    }"
   else
     noti.device = config.device_id
   noti
@@ -28,11 +32,11 @@ describe 'Apnshit', ->
     config = fs.readFileSync("#{__dirname}/config.json")
     config = JSON.parse(config)
     apns   = new Apnshit(
-      cert   : config.cert
-      key    : config.key
-      gateway: "gateway.sandbox.push.apple.com"
-      port   : 2195
-      timeout: 1000
+      cert          : config.cert
+      key           : config.key
+      gateway       : "gateway.sandbox.push.apple.com"
+      port          : 2195
+      resend_on_drop: true
     )
 
   describe '#connect()', ->
@@ -50,20 +54,25 @@ describe 'Apnshit', ->
     it 'should recover from failure', (done) ->
       errors = 0
       promise = apns.send(notification(true))
-      for i in [0..8]
+
+      for i in [0..48]
         promise.then(
           => apns.send(notification(true))
         )
+      
       promise.then(
         => apns.send(notification())
       ).then(
         (n) -> notifications.push(n)
       )
+      
       apns.on 'error', (n) =>
         errors += 1
         process.stdout.write('.')
+      
       apns.on 'done', =>
-        errors.should.equal(10)
+        console.log('errors', errors)
+        errors.should.equal(50)
         done()
 
   describe 'verify notifications', ->
