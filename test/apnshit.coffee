@@ -1,5 +1,6 @@
 Apnshit = require('../lib/apnshit')
-fs = require('fs')
+fs      = require('fs')
+_       = require('underscore')
 
 apns          = null
 config        = null
@@ -39,6 +40,33 @@ describe 'Apnshit', ->
       resend_on_drop: true
     )
 
+    events = [
+      'connect#start'
+      'connect#exists'
+      'connect#connecting'
+      'connect#connected'
+      'disconnect#start'
+      'disconnect#drop'
+      'disconnect#drop#resend'
+      'disconnect#drop#nothing_to_resend'
+      'disconnect#finish'
+      'send#write'
+      'send#write#finish'
+      'socketData#start'
+      'socketData#invalid_token'
+      'socketData#invalid_token#intentional_bad_notification'
+      'socketData#invalid_token#notification'
+      'socketData#resend'
+      'watchForStaleSocket#start'
+      'watchForStaleSocket#interval_start'
+      'watchForStaleSocket#stale'
+      'watchForStaleSocket#stale#no_response'
+      'watchForStaleSocket#stale#intentional_bad_notification'
+    ]
+
+    _.each events, (e) =>
+      apns.on e, => console.log(e)
+
   describe '#connect()', ->
     it 'should connect', (done) ->
       apns.connect().then(-> done())
@@ -55,7 +83,7 @@ describe 'Apnshit', ->
       errors = 0
       promise = apns.send(notification(true))
 
-      for i in [0..48]
+      for i in [0..8]
         promise.then(
           => apns.send(notification(true))
         )
@@ -72,7 +100,7 @@ describe 'Apnshit', ->
       
       apns.on 'done', =>
         console.log('errors', errors)
-        errors.should.equal(50)
+        errors.should.equal(10)
         done()
 
   describe 'verify notifications', ->

@@ -23,13 +23,14 @@ module.exports = class Apnshit extends EventEmitter
     _.extend @options, options
 
   connect: ->
-    console.log('connect @connect_promise', @connect_promise)
+    @emit('connect#start', @connect_promise)
+
     @connect_promise ||= @defer (resolve, reject) =>
       if @socket && @socket.writable
-        console.log('connection exists')
+        @emit('connect#exists')
         resolve()
       else
-        console.log('connecting!')
+        @emit('connect#connecting')
         @connecting = true
         socket_options =
           ca                : @options.ca
@@ -42,21 +43,15 @@ module.exports = class Apnshit extends EventEmitter
         @socket = tls.connect @options.port, @options.gateway, socket_options, =>
           resolve()
           delete @connect_promise
-          @emit("connect")
+          @emit("connect#connected")
           @watchForStaleSocket()
-          console.log('connected!')
 
-        @socket.on "end",         => @socketEnd
-        @socket.on "error",       => @socketError
-        @socket.on "timeout",     => @socketTimeout
         @socket.on "data", (data) => @socketData(data)
-        @socket.on "drain",       => @socketDrain
-        @socket.on "clientError", => @socketClientError
-        @socket.on "close",       => @socketClose
 
         # @socket.setKeepAlive(true)
-        @socket.setNoDelay(false)
         # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
+
+        @socket.setNoDelay(false)
         @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
@@ -65,7 +60,7 @@ module.exports = class Apnshit extends EventEmitter
     d.promise
 
   disconnect: (options = {}) ->
-    console.log('disconnect')
+    @emit("disconnect#start")
 
     delete @bad_alert_sent
     delete @bytes_read
@@ -76,27 +71,26 @@ module.exports = class Apnshit extends EventEmitter
     delete @socket
 
     if options.drop
-      drop = (
+      @emit("disconnect#drop", @not_sure_if_sent)
+
+      resend = (
         @options.resend_on_drop &&
         @not_sure_if_sent &&
         @not_sure_if_sent.length
       )
-      console.log(
-        "drop @not_sure_if_sent.length"
-        if @not_sure_if_sent.length then @not_sure_if_sent.length else 0
-      )
-      if drop
+
+      if resend
         resend = @not_sure_if_sent.slice()
         @not_sure_if_sent = []
-        
-        console.log('drop resend', @inspect(resend))
-        console.log('drop resend.length', resend.length)
 
-        for item in resend
-          @send(item)
+        @emit("disconnect#drop#resend", resend)
+        @send(item) for item in resend
       else
-        @emit('done')
+        @emit("disconnect#drop#nothing_to_resend")
+        @emit("finish")
     else
+      @emit("disconnect#finish")
+      @emit("finish")
       @not_sure_if_sent = []
 
     clearInterval(@interval) if @interval
@@ -141,14 +135,18 @@ module.exports = class Apnshit extends EventEmitter
         @not_sure_if_sent.push(notification)
 
         @defer (resolve, reject) =>
-          console.log('write', notification.alert)
+          @emit('send#write', notification)
           @socket.write data, encoding, =>
+            @emit('send#write#finish', notification)
             resolve(notification)
     )
 
   socketData: (data) ->
-    console.log('socketData', data[0])
+    @emit('socketData#start', data)
+
     if data[0] == 8
+      @emit('socketData#invalid_token', data)
+
       error_code = data[1]
       identifier = data.readUInt32BE(2)
 
@@ -157,60 +155,27 @@ module.exports = class Apnshit extends EventEmitter
       
       if notification
         if notification.alert == 'x'
+          @emit('socketData#invalid_token#intentional_bad_notification')
           @emit('done')  
         else
-          console.log('error', notification.alert)
+          @emit('socketData#invalid_token#notification', notification)
           @emit('error', notification)
 
           resend = @not_sure_if_sent.slice(
             @not_sure_if_sent.indexOf(notification) + 1
           )
 
-          @disconnect(drop: @bad_alert_sent)
-
-          console.log('resend', @inspect(resend))
-          console.log('resend.length', resend.length)
-          
-          for item in resend
-            # console.log('resend', item.alert)
-            @send(item)
-
-  inspect: (arr) ->
-    output = _.map arr, (item) -> item.alert
-    "[ #{output.join(',')} ]"
-
-  socketDrain: ->
-    console.log('socket drain')
-  
-  socketEnd: ->
-    console.log('socket end')
-    @disconnect()
-
-  socketError: ->
-    console.log('socket error')
-    @disconnect()
-
-  socketClientError: ->
-    console.log('socket client error')
-    @disconnect()
-  
-  socketClose: ->
-    console.log('socket close')
-    @disconnect()
-  
-  socketTimeout: ->
-    console.log('socket timeout')
-    @disconnect()
+          @disconnect()
+          @emit('socketData#resend', resend)
+          @send(item) for item in resend
 
   watchForStaleSocket: =>
-    console.log('watchForStaleSocket')
+    @emit('watchForStaleSocket#start')
 
     clearInterval(@interval) if @interval
     @interval = setInterval(
       =>
-        console.log('setInterval')
-        console.log('socket?', if @socket then 'true' else 'false')
-        console.log("@socket.writable", @socket.writable) if @socket
+        @emit('watchForStaleSocket#interval_start')        
 
         if @socket && !@socket.writable
           @disconnect(drop: true)
@@ -223,19 +188,19 @@ module.exports = class Apnshit extends EventEmitter
           @socket.bytesWritten == @bytes_written
         )
 
-        console.log("stale", stale)
+        @emit('watchForStaleSocket#stale', stale)
 
         if stale
           if @bad_alert_sent
-            console.log("bad alert not responded to")
+            @emit('watchForStaleSocket#stale#no_response')
             @disconnect(drop: true)
           else
-            console.log("sending bad alert!")
+            @emit('watchForStaleSocket#stale#intentional_bad_notification')
 
             noti = new @Notification()
             noti.alert  = "x"
             noti.badge  = 0
-            noti.sound  = 'default'
+            noti.sound  = "default"
             noti.device = Array(32).join("a0")
 
             @bad_alert_sent = true
