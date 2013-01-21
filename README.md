@@ -38,13 +38,13 @@ Emits when there are `@not_sure_if_sent` notifications to be resent.
 
 ###disconnect#drop#nothing_to_resend
 
-** Alias: `finish` **
+**Aliases: `finish`**
 
 Emits when there are not any `@not_sure_if_sent` notifications to be resent.
 
 ###disconnect#finish
 
-** Alias: `finish` **
+**Aliases: `finish`**
 
 Emits when `disconnect()` called without the drop option, meaning no further action will be taken on this connection.
 
@@ -66,7 +66,7 @@ Emits when the socket receives "invalid token" error data.
 
 ###socketData#invalid_token#intentional_bad_notification
 
-**Aliases: `done`**
+**Aliases: `finish`**
 
 Emit when the invalid token was a result of an intentional bad notification to test connection status.
 
