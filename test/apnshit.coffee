@@ -59,8 +59,6 @@ describe 'Apnshit', ->
       'socketData#invalid_token'
       'socketData#invalid_token#intentional_bad_notification'
       'socketData#invalid_token#notification'
-      'socketData#invalid_token#resend'
-      'socketData#invalid_token#nothing_to_resend'
       'watchForStaleSocket#start'
       'watchForStaleSocket#interval_start'
       'watchForStaleSocket#stale'

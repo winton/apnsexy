@@ -76,16 +76,6 @@ Emit when the invalid token was a result of an intentional bad notification to t
 
 Emits when the invalid notification is found within `@not_sure_if_sent`.
 
-###socketData#invalid_token#resend(resend)
-
-Emits when there are `@not_sure_if_sent` notifications to be resent (`resend` consists of all pending notifications after the invalid one).
-
-###socketData#invalid_token#nothing_to_resend
-
-** Alias: `finish` **
-
-Emits when there are not any `@not_sure_if_sent` notifications to be resent.
-
 ###watchForStaleSocket#start
 
 Emits immediately upon calling `watchForStaleSocket()`.
