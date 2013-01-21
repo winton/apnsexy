@@ -2,10 +2,13 @@ Apnshit = require('../lib/apnshit')
 fs      = require('fs')
 _       = require('underscore')
 
-apns          = null
-config        = null
-device_id     = null
-notifications = []
+apns            = null
+config          = null
+device_id       = null
+errors          = null
+expected_errors = null
+notifications   = []
+sample          = null
 
 notification = (bad = false) ->
   noti = new apns.Notification()
@@ -41,7 +44,7 @@ describe 'Apnshit', ->
     )
 
     events = [
-      'connect#start'
+      #'connect#start'
       'connect#exists'
       'connect#connecting'
       'connect#connected'
@@ -56,7 +59,8 @@ describe 'Apnshit', ->
       'socketData#invalid_token'
       'socketData#invalid_token#intentional_bad_notification'
       'socketData#invalid_token#notification'
-      'socketData#resend'
+      'socketData#invalid_token#resend'
+      'socketData#invalid_token#nothing_to_resend'
       'watchForStaleSocket#start'
       'watchForStaleSocket#interval_start'
       'watchForStaleSocket#stale'
@@ -65,7 +69,15 @@ describe 'Apnshit', ->
     ]
 
     _.each events, (e) =>
-      apns.on e, => console.log(e)
+      apns.on e, (a, b) =>
+        if e == 'send#write'
+          console.log(e, a.alert)
+        else if e == 'socketData#invalid_token#notification'
+          console.log(e, a.alert)
+        else if e == "disconnect#drop#resend"
+          console.log(e, a.length)
+        else
+          console.log(e)
 
   describe '#connect()', ->
     it 'should connect', (done) ->
@@ -74,23 +86,27 @@ describe 'Apnshit', ->
   describe '#send()', ->
     it 'should send a notification', (done) ->
       apns.send(notification()).then(
-        (n) ->
-          notifications.push(n)
-          done()
+        (n) -> notifications.push(n)
       )
+      apns.once 'finish', => done()
 
     it 'should recover from failure', (done) ->
-      errors = 0
-      promise = apns.send(notification(true))
+      errors          = 0
+      expected_errors = 0
+      promise         = apns.send(notification())
+      sample          = 40
 
-      for i in [0..8]
+      for i in [0..sample-2]
         promise.then(
-          => apns.send(notification(true))
+          =>
+            bad = Math.floor(Math.random()*sample*0.2) != 1
+            expected_errors += 1 if bad
+            n = notification(bad)
+            notifications.push(n) unless bad
+            apns.send(n)
         )
       
       promise.then(
-        => apns.send(notification())
-      ).then(
         (n) -> notifications.push(n)
       )
       
@@ -98,13 +114,16 @@ describe 'Apnshit', ->
         errors += 1
         process.stdout.write('.')
       
-      apns.on 'done', =>
-        console.log('errors', errors)
-        errors.should.equal(10)
+      apns.once 'finish', =>
+        errors.should.equal(expected_errors)
         done()
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
-      for n in notifications
-        console.log("\n#{n.alert}")
+      notifications = _.map notifications, (n) =>
+        n.alert.replace(/\D+/g, '')
+      console.log("\n#{notifications.sort().join("\n")}")
+      console.log("\n#{errors} errors")
+      console.log("\n#{notifications.length} notifications")
+      console.log("\n#{sample} sample size")
       done()

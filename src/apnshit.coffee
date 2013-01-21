@@ -47,6 +47,7 @@ module.exports = class Apnshit extends EventEmitter
           @watchForStaleSocket()
 
         @socket.on "data", (data) => @socketData(data)
+        @socket.on "error",       => @disconnect(drop: true)
 
         # @socket.setKeepAlive(true)
         # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
@@ -73,14 +74,20 @@ module.exports = class Apnshit extends EventEmitter
     if options.drop
       @emit("disconnect#drop", @not_sure_if_sent)
 
-      resend = (
-        @options.resend_on_drop &&
-        @not_sure_if_sent &&
-        @not_sure_if_sent.length
-      )
+      if options.resend
+        resend = (
+          options.resend &&
+          options.resend.length
+        )
+      else
+        resend = (
+          @options.resend_on_drop &&
+          @not_sure_if_sent &&
+          @not_sure_if_sent.length
+        )
 
       if resend
-        resend = @not_sure_if_sent.slice()
+        resend = options.resend || @not_sure_if_sent.slice()
         @not_sure_if_sent = []
 
         @emit("disconnect#drop#resend", resend)
@@ -155,8 +162,8 @@ module.exports = class Apnshit extends EventEmitter
       
       if notification
         if notification.alert == 'x'
+          @disconnect()
           @emit('socketData#invalid_token#intentional_bad_notification')
-          @emit('done')  
         else
           @emit('socketData#invalid_token#notification', notification)
           @emit('error', notification)
@@ -165,9 +172,7 @@ module.exports = class Apnshit extends EventEmitter
             @not_sure_if_sent.indexOf(notification) + 1
           )
 
-          @disconnect()
-          @emit('socketData#resend', resend)
-          @send(item) for item in resend
+          @disconnect(drop: true, resend: resend)
 
   watchForStaleSocket: =>
     @emit('watchForStaleSocket#start')
