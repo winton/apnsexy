@@ -9,16 +9,16 @@ module.exports = class Apnshit extends EventEmitter
     @on "error", ->
     
     @options =
-      ca                : null
-      cert              : 'cert.pem'
-      enhanced          : true
-      gateway           : 'gateway.push.apple.com'
-      key               : 'key.pem'
-      passphrase        : null
-      port              : 2195
-      resend_on_drop    : false
-      timeout           : 5000
-      rejectUnauthorized: true
+      ca                 : null
+      cert               : 'cert.pem'
+      enhanced           : true
+      gateway            : 'gateway.push.apple.com'
+      key                : 'key.pem'
+      passphrase         : null
+      port               : 2195
+      resend_on_drop     : false
+      timeout            : 2000
+      reject_unauthorized: true
 
     _.extend @options, options
 
@@ -37,7 +37,7 @@ module.exports = class Apnshit extends EventEmitter
           cert              : fs.readFileSync(@options.cert)
           key               : fs.readFileSync(@options.key)
           passphrase        : @options.passphrase
-          rejectUnauthorized: @options.rejectUnauthorized
+          rejectUnauthorized: @options.reject_unauthorized
           socket            : new net.Stream()
 
         @socket = tls.connect @options.port, @options.gateway, socket_options, =>
@@ -61,12 +61,13 @@ module.exports = class Apnshit extends EventEmitter
     d.promise
 
   disconnect: (options = {}) ->
-    @emit("disconnect#start")
+    @emit("disconnect#start", options)
 
     delete @bad_alert_sent
     delete @bytes_read
     delete @bytes_written
     delete @connect_promise
+    delete @stale_count
 
     @socket.destroy()
     delete @socket
@@ -103,6 +104,8 @@ module.exports = class Apnshit extends EventEmitter
     clearInterval(@interval) if @interval
 
   send: (notification) ->
+    @emit("send#start", notification)
+
     @current_id       ||= 0
     @not_sure_if_sent ||= []
 
@@ -115,6 +118,8 @@ module.exports = class Apnshit extends EventEmitter
   
     @connect().then(
       =>
+        @emit("send#connected", notification)
+
         notification._uid = @current_id++
         @current_id = 0  if @current_id > 0xffffffff
 
@@ -151,28 +156,25 @@ module.exports = class Apnshit extends EventEmitter
   socketData: (data) ->
     @emit('socketData#start', data)
 
-    if data[0] == 8
-      @emit('socketData#invalid_token', data)
+    error_code = data[0]
+    identifier = data.readUInt32BE(2)
 
-      error_code = data[1]
-      identifier = data.readUInt32BE(2)
+    notification = _.find @not_sure_if_sent, (item, i) =>
+      item._uid == identifier
+    
+    if notification
+      if notification.alert == 'x'
+        @emit('socketData#found_intentional_bad_notification')
+        @disconnect()
+      else
+        @emit('socketData#found_notification', notification)
+        @emit('error', notification) if error_code == 8
 
-      notification = _.find @not_sure_if_sent, (item, i) =>
-        item._uid == identifier
-      
-      if notification
-        if notification.alert == 'x'
-          @disconnect()
-          @emit('socketData#invalid_token#intentional_bad_notification')
-        else
-          @emit('socketData#invalid_token#notification', notification)
-          @emit('error', notification)
+        resend = @not_sure_if_sent.slice(
+          @not_sure_if_sent.indexOf(notification) + 1
+        )
 
-          resend = @not_sure_if_sent.slice(
-            @not_sure_if_sent.indexOf(notification) + 1
-          )
-
-          @disconnect(drop: true, resend: resend)
+        @disconnect(drop: true, resend: resend)
 
   watchForStaleSocket: =>
     @emit('watchForStaleSocket#start')
@@ -196,10 +198,13 @@ module.exports = class Apnshit extends EventEmitter
         @emit('watchForStaleSocket#stale', stale)
 
         if stale
+          @stale_count ||= 0
+          @stale_count  += 1
+
           if @bad_alert_sent
             @emit('watchForStaleSocket#stale#no_response')
             @disconnect(drop: true)
-          else
+          else if @stale_count == 2
             @emit('watchForStaleSocket#stale#intentional_bad_notification')
 
             noti = new @Notification()
@@ -209,6 +214,7 @@ module.exports = class Apnshit extends EventEmitter
             noti.device = Array(32).join("a0")
 
             @bad_alert_sent = true
+
             @send(noti)
 
         if @socket

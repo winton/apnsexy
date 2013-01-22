@@ -48,6 +48,14 @@ Emits when there are not any `@not_sure_if_sent` notifications to be resent.
 
 Emits when `disconnect()` called without the drop option, meaning no further action will be taken on this connection.
 
+###send#start(notification)
+
+Emits immediately upon calling `send()`.
+
+###send#connected(notification)
+
+Emits after verifying the connection but before writing to the socket.
+
 ###send#write(notification)
 
 Emits before a notification is written to the socket.
@@ -60,17 +68,13 @@ Emits after a notification is written to the socket.
 
 Emits when the socket receives data.
 
-###socketData#invalid_token(data)
-
-Emits when the socket receives "invalid token" error data.
-
-###socketData#invalid_token#intentional_bad_notification
+###socketData#found_intentional_bad_notification
 
 **Aliases: `finish`**
 
 Emit when the invalid token was a result of an intentional bad notification to test connection status.
 
-###socketData#invalid_token#notification(notification)
+###socketData#found_notification(notification)
 
 **Aliases: `error`**
 

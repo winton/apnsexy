@@ -3,12 +3,16 @@ fs      = require('fs')
 _       = require('underscore')
 
 apns            = null
+bad             = []
 config          = null
 device_id       = null
-errors          = null
+drops           = null
+errors          = []
 expected_errors = null
+good            = []
 notifications   = []
 sample          = null
+success         = []
 
 notification = (bad = false) ->
   noti = new apns.Notification()
@@ -53,12 +57,13 @@ describe 'Apnshit', ->
       'disconnect#drop#resend'
       'disconnect#drop#nothing_to_resend'
       'disconnect#finish'
+      'send#start'
+      'send#connected'
       'send#write'
       'send#write#finish'
       'socketData#start'
-      'socketData#invalid_token'
-      'socketData#invalid_token#intentional_bad_notification'
-      'socketData#invalid_token#notification'
+      'socketData#found_intentional_bad_notification'
+      'socketData#found_notification'
       'watchForStaleSocket#start'
       'watchForStaleSocket#interval_start'
       'watchForStaleSocket#stale'
@@ -74,6 +79,10 @@ describe 'Apnshit', ->
           console.log(e, a.alert)
         else if e == "disconnect#drop#resend"
           console.log(e, a.length)
+        else if e == "socketData#start"
+          console.log(e, a[0])
+        else if e == "disconnect#start"
+          console.log(e, JSON.stringify(a))
         else
           console.log(e)
 
@@ -89,39 +98,65 @@ describe 'Apnshit', ->
       apns.once 'finish', => done()
 
     it 'should recover from failure', (done) ->
-      errors          = 0
+      bad             = []
+      drops           = 0
+      errors          = []
       expected_errors = 0
-      promise         = apns.send(notification())
-      sample          = 40
+      good            = []
+      sample          = 200
+      success         = []
 
-      for i in [0..sample-2]
-        promise.then(
-          =>
-            bad = Math.floor(Math.random()*sample*0.2) != 1
-            expected_errors += 1 if bad
-            n = notification(bad)
-            notifications.push(n) unless bad
-            apns.send(n)
-        )
-      
-      promise.then(
-        (n) -> notifications.push(n)
-      )
+      for i in [0..sample-1]
+        is_bad = Math.floor(Math.random()*sample*0.5) != 1
+        n = notification(is_bad)
+        if is_bad
+          expected_errors += 1
+          bad.push(n)
+        else
+          good.push(n)
+          notifications.push(n)
+        apns.send(n)
       
       apns.on 'error', (n) =>
-        errors += 1
-        process.stdout.write('.')
+        errors.push(n)
+        process.stdout.write('b')
+
+      apns.on 'success', (n) =>
+        success.push(n)
+        process.stdout.write('g')
+
+      apns.on 'watchForStaleSocket#stale#no_response', =>
+        drops += 1
       
       apns.once 'finish', =>
-        errors.should.equal(expected_errors)
+        errors.length.should.equal(expected_errors)
         done()
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
+      console.log('')
+
+      bad_diff  = _.filter bad,    (n) => errors.indexOf(n) == -1
+      good_diff = _.filter good,   (n) => success.indexOf(n) == -1
+      bad_diff  = _.map bad_diff,  (n) => n.alert
+      good_diff = _.map good_diff, (n) => n.alert
+
       notifications = _.map notifications, (n) =>
         n.alert.replace(/\D+/g, '')
-      console.log("\n#{notifications.sort().join("\n")}")
-      console.log("\n#{errors} errors")
-      console.log("\n#{notifications.length} notifications")
-      console.log("\n#{sample} sample size")
+
+      console.log(
+        "\nmissed success events:",
+        if good_diff.length then good_diff.join(", ") else "none!"
+      )
+
+      console.log(
+        "\nmissed error events:",
+        if bad_diff.length then bad_diff.join(", ") else "none!"
+      )
+      console.log("\nsample size: #{sample}")
+      console.log("\ndrops: #{drops}")
+      console.log("\n#{errors.length} errors / #{expected_errors} expected")
+      console.log("\n#{notifications.length} notifications:")
+      console.log("\n#{notifications.join("\n")}")
+
       done()
