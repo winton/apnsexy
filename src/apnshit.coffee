@@ -11,6 +11,7 @@ module.exports = class Apnshit extends EventEmitter
     @options =
       ca                 : null
       cert               : 'cert.pem'
+      debug              : false
       enhanced           : true
       gateway            : 'gateway.push.apple.com'
       key                : 'key.pem'
@@ -21,6 +22,20 @@ module.exports = class Apnshit extends EventEmitter
       reject_unauthorized: true
 
     _.extend @options, options
+
+    if @options.debug
+      _.each @events, (e) =>
+        @on e, (a, b) =>
+          if e == 'send#write'
+            @emit('debug', e, a.alert)
+          else if e == 'socketData#invalid_token#notification'
+            @emit('debug', e, a.alert)
+          else if e == "disconnect#drop#resend"
+            @emit('debug', e, a.length)
+          else if e == "socketData#start"
+            @emit('debug', e, a[0])
+          else
+            @emit('debug', e)
 
   connect: ->
     @emit('connect#start', @connect_promise)
@@ -47,18 +62,45 @@ module.exports = class Apnshit extends EventEmitter
           @watchForStaleSocket()
 
         @socket.on "data", (data) => @socketData(data)
-        @socket.on "error",       => @disconnect(drop: true)
+        @socket.on "error",   (e) =>
+          @emit("socket#error", e)
+          @disconnect(drop: true)
 
         # @socket.setKeepAlive(true)
         # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
+        # @socket.setNoDelay(false)
 
-        @socket.setNoDelay(false)
         @socket.socket.connect @options.port, @options.gateway
 
   defer: (fn) ->
     d = Q.defer()
     fn(d.resolve, d.reject)
     d.promise
+
+  events: [
+    'connect#start'
+    'connect#exists'
+    'connect#connecting'
+    'connect#connected'
+    'disconnect#start'
+    'disconnect#drop'
+    'disconnect#drop#resend'
+    'disconnect#drop#nothing_to_resend'
+    'disconnect#finish'
+    'send#start'
+    'send#connected'
+    'send#write'
+    'send#write#finish'
+    'socket#error'
+    'socketData#start'
+    'socketData#found_intentional_bad_notification'
+    'socketData#found_notification'
+    'watchForStaleSocket#start'
+    'watchForStaleSocket#interval_start'
+    'watchForStaleSocket#stale'
+    'watchForStaleSocket#stale#no_response'
+    'watchForStaleSocket#stale#intentional_bad_notification'
+  ]
 
   disconnect: (options = {}) ->
     @emit("disconnect#start", options)

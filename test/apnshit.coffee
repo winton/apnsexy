@@ -39,52 +39,31 @@ describe 'Apnshit', ->
   before ->
     config = fs.readFileSync("#{__dirname}/config.json")
     config = JSON.parse(config)
-    apns   = new Apnshit(
+
+    apns = new Apnshit(
       cert          : config.cert
+      debug         : true
       key           : config.key
       gateway       : "gateway.sandbox.push.apple.com"
       port          : 2195
       resend_on_drop: true
     )
 
-    events = [
-      #'connect#start'
-      'connect#exists'
-      'connect#connecting'
-      'connect#connected'
-      'disconnect#start'
-      'disconnect#drop'
-      'disconnect#drop#resend'
-      'disconnect#drop#nothing_to_resend'
-      'disconnect#finish'
-      'send#start'
-      'send#connected'
-      'send#write'
-      'send#write#finish'
-      'socketData#start'
-      'socketData#found_intentional_bad_notification'
-      'socketData#found_notification'
-      'watchForStaleSocket#start'
-      'watchForStaleSocket#interval_start'
-      'watchForStaleSocket#stale'
-      'watchForStaleSocket#stale#no_response'
-      'watchForStaleSocket#stale#intentional_bad_notification'
-    ]
+    apns.events = _.filter apns.events, (e) =>
+      [ 'connect#start', 'send#start' ].indexOf(e) < 0
 
-    _.each events, (e) =>
-      apns.on e, (a, b) =>
-        if e == 'send#write'
-          console.log(e, a.alert)
-        else if e == 'socketData#invalid_token#notification'
-          console.log(e, a.alert)
-        else if e == "disconnect#drop#resend"
-          console.log(e, a.length)
-        else if e == "socketData#start"
-          console.log(e, a[0])
-        else if e == "disconnect#start"
-          console.log(e, JSON.stringify(a))
-        else
-          console.log(e)
+    apns.on 'debug', console.log
+
+    apns.on 'error', (n) =>
+      errors.push(n)
+      process.stdout.write('b')
+
+    apns.on 'success', (n) =>
+      success.push(n)
+      process.stdout.write('g')
+
+    apns.on 'watchForStaleSocket#stale#no_response', =>
+      drops += 1
 
   describe '#connect()', ->
     it 'should connect', (done) ->
@@ -97,13 +76,13 @@ describe 'Apnshit', ->
       )
       apns.once 'finish', => done()
 
-    it 'should recover from failure', (done) ->
+    it 'should recover from failure (mostly bad)', (done) ->
       bad             = []
       drops           = 0
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 200
+      sample          = 20
       success         = []
 
       for i in [0..sample-1]
@@ -116,17 +95,6 @@ describe 'Apnshit', ->
           good.push(n)
           notifications.push(n)
         apns.send(n)
-      
-      apns.on 'error', (n) =>
-        errors.push(n)
-        process.stdout.write('b')
-
-      apns.on 'success', (n) =>
-        success.push(n)
-        process.stdout.write('g')
-
-      apns.on 'watchForStaleSocket#stale#no_response', =>
-        drops += 1
       
       apns.once 'finish', =>
         errors.length.should.equal(expected_errors)

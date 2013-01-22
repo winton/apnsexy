@@ -8,6 +8,10 @@ Node.js APNS library that tries not to be as shitty as APNS.
 
 ##Events
 
+###debug(event, a, b, c, ...)
+
+Emits when any event below fires. Can emit directly into console.log.
+
 ###connect#start(@connect_promise)
 
 Emits immediately upon calling `connect()`.
@@ -79,6 +83,10 @@ Emit when the invalid token was a result of an intentional bad notification to t
 **Aliases: `error`**
 
 Emits when the invalid notification is found within `@not_sure_if_sent`.
+
+###socket#error(error)
+
+Emits when the socket throws an error event.
 
 ###watchForStaleSocket#start
 
