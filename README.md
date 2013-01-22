@@ -36,6 +36,16 @@ Emits immediately upon calling `disconnect()`.
 
 Emits when this disconnect is the result of a dropped connection.
 
+###disconnect#drop#infinite_resend(resend)
+
+Emits when last resend is identical to the current one.
+
+###disconnect#drop#infinite_resend#limit_reached(resend)
+
+**Aliases: `drop`**
+
+Emits when there have been `infinite_resent_limit` identical resends.
+
 ###disconnect#drop#resend(resend)
 
 Emits when there are `@not_sure_if_sent` notifications to be resent.

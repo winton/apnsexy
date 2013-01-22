@@ -9,18 +9,19 @@ module.exports = class Apnshit extends EventEmitter
     @on "error", ->
     
     @options =
-      ca                 : null
-      cert               : 'cert.pem'
-      debug              : false
-      debug_ignore       : []
-      enhanced           : true
-      gateway            : 'gateway.push.apple.com'
-      key                : 'key.pem'
-      passphrase         : null
-      port               : 2195
-      resend_on_drop     : false
-      timeout            : 2000
-      reject_unauthorized: true
+      ca                   : null
+      cert                 : 'cert.pem'
+      debug                : false
+      debug_ignore         : []
+      enhanced             : true
+      gateway              : 'gateway.push.apple.com'
+      infinite_resend_limit: 10
+      key                  : 'key.pem'
+      passphrase           : null
+      port                 : 2195
+      resend_on_drop       : true
+      timeout              : 2000
+      reject_unauthorized  : true
 
     _.extend @options, options
 
@@ -86,6 +87,8 @@ module.exports = class Apnshit extends EventEmitter
     'connect#connected'
     'disconnect#start'
     'disconnect#drop'
+    'disconnect#drop#infinite_resend'
+    'disconnect#drop#infinite_resend#limit_reached'
     'disconnect#drop#resend'
     'disconnect#drop#nothing_to_resend'
     'disconnect#finish'
@@ -116,6 +119,8 @@ module.exports = class Apnshit extends EventEmitter
     @socket.destroy()
     delete @socket
 
+    clearInterval(@interval) if @interval
+
     if options.drop
       @emit("disconnect#drop", @not_sure_if_sent)
 
@@ -133,10 +138,38 @@ module.exports = class Apnshit extends EventEmitter
 
       if resend
         resend = options.resend || @not_sure_if_sent.slice()
-        @not_sure_if_sent = []
+        
+        @not_sure_if_sent   = []
+        @last_resend_uids ||= []
 
+        resend_uids = _.map resend, (n) => n._last_uid
+
+        if !(resend_uids < @last_resend_uids || @last_resend_uids < resend_uids)
+        #  ^ equality test
+
+          @emit("disconnect#drop#infinite_resend", resend)
+          
+          @infinite_resend_count ||= 0
+          @infinite_resend_count++
+
+          if @infinite_resend_count == @options.infinite_resend_limit
+            @emit("disconnect#drop#infinite_resend#limit_reached", resend)
+            @emit("dropped", resend)
+
+            delete @last_resend_uids
+            return
+        else
+          @infinite_resend_count = 0
+        
         @emit("disconnect#drop#resend", resend)
-        @send(item) for item in resend
+        
+        @last_resend_uids = _.map resend, (n) => n._uid
+
+        # exponential backoff
+        setTimeout(
+          => @send(item) for item in resend
+          500 * @infinite_resend_count
+        )
       else
         @emit("disconnect#drop#nothing_to_resend")
         @emit("finish")
@@ -144,8 +177,6 @@ module.exports = class Apnshit extends EventEmitter
       @emit("disconnect#finish")
       @emit("finish")
       @not_sure_if_sent = []
-
-    clearInterval(@interval) if @interval
 
   send: (notification) ->
     @emit("send#start", notification)
@@ -164,7 +195,9 @@ module.exports = class Apnshit extends EventEmitter
       =>
         @emit("send#connected", notification)
 
-        notification._uid = @current_id++
+        notification._last_uid = notification._uid
+        notification._uid      = @current_id++
+
         @current_id = 0  if @current_id > 0xffffffff
 
         if @options.enhanced
@@ -243,7 +276,7 @@ module.exports = class Apnshit extends EventEmitter
 
         if stale
           @stale_count ||= 0
-          @stale_count  += 1
+          @stale_count++
 
           if @bad_alert_sent
             @emit('watchForStaleSocket#stale#no_response')

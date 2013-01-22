@@ -80,7 +80,7 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 20
+      sample          = 500
       success         = []
 
       for i in [0..sample-1]
@@ -94,6 +94,9 @@ describe 'Apnshit', ->
           notifications.push(n)
         apns.send(n)
       
+      apns.once 'dropped', =>
+        done()
+
       apns.once 'finish', =>
         errors.length.should.equal(expected_errors)
         done()
