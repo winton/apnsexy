@@ -12,6 +12,7 @@ module.exports = class Apnshit extends EventEmitter
       ca                 : null
       cert               : 'cert.pem'
       debug              : false
+      debug_ignore       : []
       enhanced           : true
       gateway            : 'gateway.push.apple.com'
       key                : 'key.pem'
@@ -26,6 +27,7 @@ module.exports = class Apnshit extends EventEmitter
     if @options.debug
       _.each @events, (e) =>
         @on e, (a, b) =>
+          return if @options.debug_ignore.indexOf(e) >= 0
           if e == 'send#write'
             @emit('debug', e, a.alert)
           else if e == 'socketData#invalid_token#notification'

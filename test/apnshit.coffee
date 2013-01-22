@@ -43,14 +43,12 @@ describe 'Apnshit', ->
     apns = new Apnshit(
       cert          : config.cert
       debug         : true
+      debug_ignore  : [ 'connect#start', 'send#start' ]
       key           : config.key
       gateway       : "gateway.sandbox.push.apple.com"
       port          : 2195
       resend_on_drop: true
     )
-
-    apns.events = _.filter apns.events, (e) =>
-      [ 'connect#start', 'send#start' ].indexOf(e) < 0
 
     apns.on 'debug', console.log
 
