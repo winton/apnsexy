@@ -1,11 +1,12 @@
 for key, value of require('./apnshit/common')
   eval("var #{key} = value;")
 
-module.exports = class Apnshit extends EventEmitter
+Feedback     = require './apnshit/feedback'
+Notification = require './apnshit/notification'
+
+class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @Notification = require './apnshit/notification'
-
     @on "error", ->
     
     @options =
@@ -37,13 +38,15 @@ module.exports = class Apnshit extends EventEmitter
             @emit('debug', e, a.length)
           else if e == "socketData#start"
             @emit('debug', e, a[0])
+          else if e == "socket#error"
+            @emit('debug', e, a)
           else
             @emit('debug', e)
 
   connect: ->
     @emit('connect#start', @connect_promise)
 
-    @connect_promise ||= @defer (resolve, reject) =>
+    @connect_promise ||= defer (resolve, reject) =>
       if @socket && @socket.writable
         @emit('connect#exists')
         resolve()
@@ -74,11 +77,6 @@ module.exports = class Apnshit extends EventEmitter
         # @socket.setNoDelay(false)
 
         @socket.socket.connect @options.port, @options.gateway
-
-  defer: (fn) ->
-    d = Q.defer()
-    fn(d.resolve, d.reject)
-    d.promise
 
   events: [
     'connect#start'
@@ -223,7 +221,7 @@ module.exports = class Apnshit extends EventEmitter
 
         @not_sure_if_sent.push(notification)
 
-        @defer (resolve, reject) =>
+        defer (resolve, reject) =>
           @emit('send#write', notification)
           @socket.write data, encoding, =>
             @emit('send#write#finish', notification)
@@ -284,7 +282,7 @@ module.exports = class Apnshit extends EventEmitter
           else if @stale_count == 2
             @emit('watchForStaleSocket#stale#intentional_bad_notification')
 
-            noti = new @Notification()
+            noti = new Notification()
             noti.alert  = "x"
             noti.badge  = 0
             noti.sound  = "default"
@@ -303,3 +301,8 @@ module.exports = class Apnshit extends EventEmitter
 
       @options.timeout
     )
+
+module.exports = 
+  Apnshit     : Apnshit
+  Feedback    : Feedback
+  Notification: Notification

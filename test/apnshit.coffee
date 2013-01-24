@@ -1,6 +1,12 @@
-Apnshit = require('../lib/apnshit')
+for key, value of require('../lib/apnshit/common')
+  eval("var #{key} = value;")
+
+apnshit = require('../lib/apnshit')
 fs      = require('fs')
 _       = require('underscore')
+
+Apnshit      = apnshit.Apnshit
+Notification = apnshit.Notification
 
 apns            = null
 bad             = []
@@ -14,26 +20,6 @@ notifications   = []
 sample          = null
 success         = []
 
-notification = (bad = false) ->
-  noti = new apns.Notification()
-  noti.alert =
-    "#{
-      if bad then "Bad" else "Good"
-    } notification: #{
-      Math.floor(Math.random()*10000)
-    }"
-  noti.badge = 0
-  noti.sound = 'default'
-  if bad
-    noti.device = "#{
-      Math.floor(Math.random() * (99999 - 10000 + 1)) + 10000
-    }#{
-      config.device_id.substr(5)
-    }"
-  else
-    noti.device = config.device_id
-  noti
-
 describe 'Apnshit', ->
 
   before ->
@@ -46,8 +32,6 @@ describe 'Apnshit', ->
       debug_ignore  : [ 'connect#start', 'send#start' ]
       key           : config.key
       gateway       : "gateway.sandbox.push.apple.com"
-      port          : 2195
-      resend_on_drop: true
     )
 
     apns.on 'debug', console.log
@@ -80,7 +64,7 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 500
+      sample          = 10
       success         = []
 
       for i in [0..sample-1]
@@ -129,3 +113,25 @@ describe 'Apnshit', ->
       console.log("\n#{notifications.join("\n")}")
 
       done()
+
+# Helpers
+
+notification = (bad = false) ->
+  noti = new Notification()
+  noti.alert =
+    "#{
+      if bad then "Bad" else "Good"
+    } notification: #{
+      Math.floor(Math.random()*10000)
+    }"
+  noti.badge = 0
+  noti.sound = 'default'
+  if bad
+    noti.device = "#{
+      Math.floor(Math.random() * (99999 - 10000 + 1)) + 10000
+    }#{
+      config.device_id.substr(5)
+    }"
+  else
+    noti.device = config.device_id
+  noti
