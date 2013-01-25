@@ -64,11 +64,40 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 10
+      sample          = 50
       success         = []
 
       for i in [0..sample-1]
         is_bad = Math.floor(Math.random()*sample*0.5) != 1
+        is_bad = false
+        n = notification(is_bad)
+        if is_bad
+          expected_errors += 1
+          bad.push(n)
+        else
+          good.push(n)
+          notifications.push(n)
+        apns.send(n)
+      
+      apns.once 'dropped', =>
+        done()
+
+      apns.once 'finish', =>
+        errors.length.should.equal(expected_errors)
+        done()
+
+    it 'should recover from failure (mostly bad)', (done) ->
+      bad             = []
+      drops           = 0
+      errors          = []
+      expected_errors = 0
+      good            = []
+      sample          = 50
+      success         = []
+
+      for i in [0..sample-1]
+        is_bad = Math.floor(Math.random()*sample*0.5) != 1
+        is_bad = false
         n = notification(is_bad)
         if is_bad
           expected_errors += 1
