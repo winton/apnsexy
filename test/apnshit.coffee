@@ -29,7 +29,13 @@ describe 'Apnshit', ->
     apns = new Apnshit(
       cert          : config.cert
       debug         : true
-      debug_ignore  : [ 'connect#start', 'send#start' ]
+      debug_ignore  : [
+        'connect#start'
+        'send#start'
+        'send#write'
+        'send#write#finish'
+        'send#connected'
+      ]
       key           : config.key
       gateway       : "gateway.sandbox.push.apple.com"
     )
@@ -68,7 +74,7 @@ describe 'Apnshit', ->
       success         = []
 
       for i in [0..sample-1]
-        is_good = i == 0 || Math.floor(Math.random() * 20) == 0
+        is_good = i == 0 || Math.floor(Math.random() * 50) == 0
         n = notification(i, !is_good)
         if is_good
           good.push(n)

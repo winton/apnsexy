@@ -43,6 +43,8 @@ class Apnshit extends EventEmitter
           else
             @emit('debug', e)
 
+    @reset(socket: false)
+
   connect: ->
     @emit('connect#start', @connect_promise)
 
@@ -52,7 +54,7 @@ class Apnshit extends EventEmitter
         resolve()
       else
         @emit('connect#connecting')
-        @connecting = true
+        
         socket_options =
           ca                : @options.ca
           cert              : fs.readFileSync(@options.cert)
@@ -61,16 +63,21 @@ class Apnshit extends EventEmitter
           rejectUnauthorized: @options.reject_unauthorized
           socket            : new net.Stream()
 
+        console.log('@socket', !!@socket)
+
+        console.log('tls.connect')
         @socket = tls.connect @options.port, @options.gateway, socket_options, =>
           resolve()
           delete @connect_promise
           @emit("connect#connected")
           @watchForStaleSocket()
 
-        @socket.on "data", (data) => @socketData(data)
+        @socket.on "close", (data) => console.log("CLOSE")
+        @socket.on "data" , (data) => @socketData(data)
+        @socket.on "drain", (data) => console.log("DRAIN")
         @socket.on "error",   (e) =>
           @emit("socket#error", e)
-          @disconnect(drop: true)
+          # @disconnect(drop: true, socket: true)
 
         # @socket.setKeepAlive(true)
         # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
@@ -108,73 +115,91 @@ class Apnshit extends EventEmitter
   disconnect: (options = {}) ->
     @emit("disconnect#start", options)
 
-    delete @bad_alert_sent
-    delete @bytes_read
-    delete @bytes_written
-    delete @connect_promise
-    delete @stale_count
+    @reset(socket: true).then(
+      =>
+        if options.drop
+          @connect().then =>
+            @emit("disconnect#drop", @not_sure_if_sent)
 
-    @socket.destroy()
-    delete @socket
+            if options.resend
+              resend = (
+                options.resend &&
+                options.resend.length
+              )
+            else
+              resend = (
+                @options.resend_on_drop &&
+                @not_sure_if_sent &&
+                @not_sure_if_sent.length
+              )
 
-    clearInterval(@interval) if @interval
+            if resend
+              resend = options.resend || @not_sure_if_sent.slice()
+              
+              @not_sure_if_sent   = []
+              @last_resend_uids ||= []
 
-    if options.drop
-      @emit("disconnect#drop", @not_sure_if_sent)
+              resend_uids = _.map resend, (n) => n._last_uid || false
 
-      if options.resend
-        resend = (
-          options.resend &&
-          options.resend.length
-        )
-      else
-        resend = (
-          @options.resend_on_drop &&
-          @not_sure_if_sent &&
-          @not_sure_if_sent.length
-        )
+              console.log('resend')
 
-      if resend
-        resend = options.resend || @not_sure_if_sent.slice()
-        
-        @not_sure_if_sent   = []
-        @last_resend_uids ||= []
+              if !(resend_uids < @last_resend_uids || @last_resend_uids < resend_uids)
+              #  ^ equality test
 
-        resend_uids = _.map resend, (n) => n._last_uid
+                @emit("disconnect#drop#infinite_resend", resend)
+                
+                @infinite_resend_count ||= 0
+                @infinite_resend_count++
 
-        if !(resend_uids < @last_resend_uids || @last_resend_uids < resend_uids)
-        #  ^ equality test
+                if @infinite_resend_count == @options.infinite_resend_limit
+                  @emit("disconnect#drop#infinite_resend#limit_reached", resend)
+                  @emit("dropped", resend)
 
-          @emit("disconnect#drop#infinite_resend", resend)
-          
-          @infinite_resend_count ||= 0
-          @infinite_resend_count++
+                  delete @last_resend_uids
+                  return
+              else
+                @infinite_resend_count = 0
+              
+              @emit("disconnect#drop#resend", resend)
+              
+              @last_resend_uids = _.map resend, (n) => n._uid
 
-          if @infinite_resend_count == @options.infinite_resend_limit
-            @emit("disconnect#drop#infinite_resend#limit_reached", resend)
-            @emit("dropped", resend)
-
-            delete @last_resend_uids
-            return
+              # exponential backoff
+              setTimeout(
+                => @send(item) for item in resend
+                500 * @infinite_resend_count
+              )
+            else
+              @not_sure_if_sent = []
+              @emit("disconnect#drop#nothing_to_resend")
+              @emit("finish")
         else
-          @infinite_resend_count = 0
-        
-        @emit("disconnect#drop#resend", resend)
-        
-        @last_resend_uids = _.map resend, (n) => n._uid
+          @emit("disconnect#finish")
+          @emit("finish")
+    )
 
-        # exponential backoff
-        setTimeout(
-          => @send(item) for item in resend
-          500 * @infinite_resend_count
-        )
+  reset: (options = {}) ->
+    defer (resolve, reject) =>
+      console.log('reset')
+
+      @write_promise = defer (resolve, reject) => resolve()
+
+      delete @bad_alert_sent
+      delete @bytes_read
+      delete @bytes_written
+      delete @stale_count
+
+      clearInterval(@interval) if @interval
+
+      if options.socket
+        console.log('reset socket')
+        delete @connect_promise
+        @socket.once 'close', =>
+          delete @socket
+          resolve()
+        @socket.end()
       else
-        @emit("disconnect#drop#nothing_to_resend")
-        @emit("finish")
-    else
-      @emit("disconnect#finish")
-      @emit("finish")
-      @not_sure_if_sent = []
+        resolve()
 
   send: (notification) ->
     @emit("send#start", notification)
@@ -221,11 +246,14 @@ class Apnshit extends EventEmitter
 
         @not_sure_if_sent.push(notification)
 
-        defer (resolve, reject) =>
-          @emit('send#write', notification)
-          @socket.write data, encoding, =>
-            @emit('send#write#finish', notification)
-            resolve(notification)
+        @write_promise.then(
+          =>
+            defer (resolve, reject) =>
+              @emit('send#write', notification)
+              @socket.write data, encoding, =>
+                @emit('send#write#finish', notification)
+                resolve(notification)
+        )
     )
 
   socketData: (data) ->
@@ -249,7 +277,7 @@ class Apnshit extends EventEmitter
           @not_sure_if_sent.indexOf(notification) + 1
         )
 
-        @disconnect(drop: true, resend: resend)
+        @disconnect(drop: true, resend: resend, socket: true)
 
   watchForStaleSocket: =>
     @emit('watchForStaleSocket#start')
