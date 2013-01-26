@@ -70,7 +70,7 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 300
+      sample          = 200
       success         = []
 
       for i in [0..sample-1]
@@ -87,6 +87,14 @@ describe 'Apnshit', ->
         #   i * 100
         # )
         apns.send(n)
+
+      apns.on 'send#write', (n) =>
+        process.stdout.write(
+          if n.alert.indexOf('Good') > -1
+            'g'
+          else
+            'b'
+        )
       
       apns.once 'dropped', =>
         done()
