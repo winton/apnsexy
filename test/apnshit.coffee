@@ -70,12 +70,13 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 200
+      sample          = 20
       success         = []
 
       apns.on 'send#write', (n) =>
         process.stdout.write(
-          if n.alert.indexOf('Good') > -1 then 'g' else 'b'
+          # if n.alert.indexOf('Good') > -1 then 'g' else 'b'
+          '.'
         )
       
       apns.once 'dropped', =>
@@ -86,7 +87,7 @@ describe 'Apnshit', ->
         done()
 
       for i in [0..sample-1]
-        is_good = i == 1 || Math.floor(Math.random() * 50) == 0
+        is_good = true || i == 1 || Math.floor(Math.random() * 50) == 0
         n = notification(i, !is_good)
         if is_good
           good.push(n)
@@ -102,26 +103,26 @@ describe 'Apnshit', ->
 
       bad_diff  = _.filter bad,    (n) => errors.indexOf(n) == -1
       good_diff = _.filter good,   (n) => success.indexOf(n) == -1
-      bad_diff  = _.map bad_diff,  (n) => n.alert
-      good_diff = _.map good_diff, (n) => n.alert
+      # bad_diff  = _.map bad_diff,  (n) => n.alert
+      # good_diff = _.map good_diff, (n) => n.alert
 
-      notifications = _.map notifications, (n) =>
-        n.alert.replace(/\D+/g, '')
+      # notifications = _.map notifications, (n) =>
+      #   n.alert.replace(/\D+/g, '')
 
-      console.log(
-        "\nmissed success events:",
-        if good_diff.length then good_diff.join(", ") else "none!"
-      )
+      # console.log(
+      #   "\nmissed success events:",
+      #   if good_diff.length then good_diff.join(", ") else "none!"
+      # )
 
-      console.log(
-        "\nmissed error events:",
-        if bad_diff.length then bad_diff.join(", ") else "none!"
-      )
+      # console.log(
+      #   "\nmissed error events:",
+      #   if bad_diff.length then bad_diff.join(", ") else "none!"
+      # )
       console.log("\nsample size: #{sample}")
       console.log("\ndrops: #{drops}")
       console.log("\n#{errors.length} errors / #{expected_errors} expected")
-      console.log("\n#{notifications.length} notifications:")
-      console.log("\n#{notifications.join("\n")}")
+      # console.log("\n#{notifications.length} notifications:")
+      # console.log("\n#{notifications.join("\n")}")
 
       done()
 
@@ -232,14 +233,14 @@ notification = (index = null, bad = false) ->
   ]
 
   noti = new Notification()
-  noti.alert =
-    "#{
-      if bad then "Bad" else "Good"
-    } notification: #{
-      Math.floor(Math.random()*10000)
-    }"
+  # noti.alert =
+  #   "#{
+  #     if bad then "Bad" else "Good"
+  #   } notification: #{
+  #     Math.floor(Math.random()*10000)
+  #   }"
   noti.badge = 0
-  noti.sound = 'default'
+  # noti.sound = 'default'
   if bad
     noti.device = device_ids[index % 100]
   else

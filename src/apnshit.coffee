@@ -129,6 +129,7 @@ class Apnshit extends EventEmitter
 
         if resend
           resend = options.resend || @not_sure_if_sent.slice()
+          resend = _.reject resend, (n) => n.alert == 'x'
           
           @emit("disconnect#drop#resend", resend)
           
@@ -209,9 +210,7 @@ class Apnshit extends EventEmitter
     notification._last_uid = notification._uid
     notification._uid      = @current_id++
 
-    unless notification.alert == 'x'
-      @not_sure_if_sent.push(notification)
-
+    @not_sure_if_sent.push(notification)
     @current_id = 0  if @current_id > 0xffffffff
 
     data           = undefined
