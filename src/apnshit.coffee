@@ -111,8 +111,8 @@ class Apnshit extends EventEmitter
   disconnect: (options = {}) ->
     @emit("disconnect#start", options)
     
-    if options.drop
-      @reset(socket: true).then =>
+    @reset(socket: true).then =>
+      if options.drop
         @emit("disconnect#drop", @not_sure_if_sent)
 
         if options.resend
@@ -165,9 +165,9 @@ class Apnshit extends EventEmitter
           @not_sure_if_sent = []
           @emit("disconnect#drop#nothing_to_resend")
           @emit("finish")
-    else
-      @emit("disconnect#finish")
-      @emit("finish")
+      else
+        @emit("disconnect#finish")
+        @emit("finish")
 
   reset: (options = {}) ->
     defer (resolve, reject) =>
@@ -186,10 +186,14 @@ class Apnshit extends EventEmitter
         @emit("reset#socket")
         delete @connect_promise
         if @socket
-          @socket.once 'close', =>
+          close = =>
             @emit("reset#socket#close")
+            clearTimeout(close_timer)
+            @socket.removeAllListeners('close')
             delete @socket
             resolve()
+          close_timer = setTimeout(close, 1000)
+          @socket.once('close', close)
           @socket.destroy()
         else
           resolve()

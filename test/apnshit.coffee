@@ -55,7 +55,7 @@ describe 'Apnshit', ->
 
   describe '#connect()', ->
     it 'should connect', (done) ->
-      apns.connect().then(-> done())
+      apns.connect().then(=> done())
 
   # describe '#send()', ->
   #   it 'should send a notification', (done) ->
@@ -73,27 +73,9 @@ describe 'Apnshit', ->
       sample          = 100
       success         = []
 
-      for i in [0..sample-1]
-        is_good = i == 0 || Math.floor(Math.random() * 50) == 0
-        n = notification(i, !is_good)
-        if is_good
-          good.push(n)
-          notifications.push(n)
-        else
-          expected_errors += 1
-          bad.push(n)
-        # setTimeout(
-        #   => apns.send(n)
-        #   i * 100
-        # )
-        apns.send(n)
-
       apns.on 'send#write', (n) =>
         process.stdout.write(
-          if n.alert.indexOf('Good') > -1
-            'g'
-          else
-            'b'
+          if n.alert.indexOf('Good') > -1 then 'g' else 'b'
         )
       
       apns.once 'dropped', =>
@@ -102,6 +84,17 @@ describe 'Apnshit', ->
       apns.once 'finish', =>
         errors.length.should.equal(expected_errors)
         done()
+
+      for i in [0..sample-1]
+        is_good = i == 1 || Math.floor(Math.random() * 50) == 0
+        n = notification(i, !is_good)
+        if is_good
+          good.push(n)
+          notifications.push(n)
+        else
+          expected_errors += 1
+          bad.push(n)
+        apns.send(n)
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
