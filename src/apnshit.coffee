@@ -64,22 +64,17 @@ class Apnshit extends EventEmitter
           socket            : new net.Stream()
     
         @socket = tls.connect @options.port, @options.gateway, socket_options, =>
-          resolve()
           delete @connect_promise
-          @emit("connect#connected")
           @watchForStaleSocket()
+          resolve()
+          @emit("connect#connected")
 
-        @socket.on "close", (data) => console.log("CLOSE")
         @socket.on "data" , (data) => @socketData(data)
-        @socket.on "drain", (data) => console.log("DRAIN")
         @socket.on "error",   (e) =>
           @emit("socket#error", e)
-          # @disconnect(drop: true, socket: true)
+          @disconnect()
 
-        # @socket.setKeepAlive(true)
-        # @socket.setTimeout(@options.timeout, => console.log('timeout!'))
         @socket.setNoDelay(false)
-
         @socket.socket.connect @options.port, @options.gateway
 
   events: [
@@ -94,6 +89,9 @@ class Apnshit extends EventEmitter
     'disconnect#drop#resend'
     'disconnect#drop#nothing_to_resend'
     'disconnect#finish'
+    'reset#start'
+    'reset#socket'
+    'reset#socket#close'
     'send#start'
     'send#connected'
     'send#write'
@@ -103,10 +101,11 @@ class Apnshit extends EventEmitter
     'socketData#found_intentional_bad_notification'
     'socketData#found_notification'
     'watchForStaleSocket#start'
-    'watchForStaleSocket#interval_start'
-    'watchForStaleSocket#stale'
-    'watchForStaleSocket#stale#no_response'
-    'watchForStaleSocket#stale#intentional_bad_notification'
+    'watchForStaleSocket#interval#start'
+    'watchForStaleSocket#interval#socket_not_writable'
+    'watchForStaleSocket#interval#stale'
+    'watchForStaleSocket#interval#stale#no_response'
+    'watchForStaleSocket#interval#stale#intentional_bad_notification'
   ]
 
   disconnect: (options = {}) ->
@@ -131,12 +130,12 @@ class Apnshit extends EventEmitter
         if resend
           resend = options.resend || @not_sure_if_sent.slice()
           
+          @emit("disconnect#drop#resend", resend)
+          
           @not_sure_if_sent   = []
           @last_resend_uids ||= []
 
           resend_uids = _.map resend, (n) => n._last_uid || false
-
-          console.log('resend')
 
           if !(resend_uids < @last_resend_uids || @last_resend_uids < resend_uids)
           #  ^ equality test
@@ -155,8 +154,6 @@ class Apnshit extends EventEmitter
           else
             @infinite_resend_count = 0
           
-          @emit("disconnect#drop#resend", resend)
-          
           @last_resend_uids = _.map resend, (n) => n._uid
 
           # exponential backoff
@@ -174,7 +171,7 @@ class Apnshit extends EventEmitter
 
   reset: (options = {}) ->
     defer (resolve, reject) =>
-      console.log('reset')
+      @emit("reset#start")
 
       @write_promise = defer (resolve, reject) => resolve()
 
@@ -186,12 +183,14 @@ class Apnshit extends EventEmitter
       clearInterval(@interval) if @interval
 
       if options.socket
+        @emit("reset#socket")
         delete @connect_promise
         if @socket
           @socket.once 'close', =>
+            @emit("reset#socket#close")
             delete @socket
             resolve()
-          @socket.end()
+          @socket.destroy()
         else
           resolve()
       else
@@ -203,6 +202,14 @@ class Apnshit extends EventEmitter
     @current_id       ||= 0
     @not_sure_if_sent ||= []
 
+    notification._last_uid = notification._uid
+    notification._uid      = @current_id++
+
+    unless notification.alert == 'x'
+      @not_sure_if_sent.push(notification)
+
+    @current_id = 0  if @current_id > 0xffffffff
+
     data           = undefined
     encoding       = notification.encoding || "utf8"
     message        = JSON.stringify(notification)
@@ -213,11 +220,6 @@ class Apnshit extends EventEmitter
     @connect().then(
       =>
         @emit("send#connected", notification)
-
-        notification._last_uid = notification._uid
-        notification._uid      = @current_id++
-
-        @current_id = 0  if @current_id > 0xffffffff
 
         if @options.enhanced
           data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
@@ -239,9 +241,6 @@ class Apnshit extends EventEmitter
         data.writeUInt16BE message_length, position
         position += 2
         position += data.write(message, position, encoding)
-
-        unless notification.alert == 'x'
-          @not_sure_if_sent.push(notification)
 
         @write_promise.then(
           =>
@@ -274,7 +273,7 @@ class Apnshit extends EventEmitter
           @not_sure_if_sent.indexOf(notification) + 1
         )
 
-        @disconnect(drop: true, resend: resend, socket: true)
+        @disconnect(drop: true, resend: resend)
 
   watchForStaleSocket: =>
     @emit('watchForStaleSocket#start')
@@ -282,10 +281,10 @@ class Apnshit extends EventEmitter
     clearInterval(@interval) if @interval
     @interval = setInterval(
       =>
-        @emit('watchForStaleSocket#interval_start')   
-        console.log("@socket && !@socket.writable", (@socket && !@socket.writable))
+        @emit('watchForStaleSocket#interval#start')
 
         if @socket && !@socket.writable
+          @emit('watchForStaleSocket#interval#socket_not_writable')
           @disconnect(drop: true)
           return
 
@@ -296,17 +295,17 @@ class Apnshit extends EventEmitter
           @socket.bytesWritten == @bytes_written
         )
 
-        @emit('watchForStaleSocket#stale', stale)
+        @emit('watchForStaleSocket#interval#stale', stale)
 
         if stale
           @stale_count ||= 0
           @stale_count++
 
           if @bad_alert_sent
-            @emit('watchForStaleSocket#stale#no_response')
+            @emit('watchForStaleSocket#interval#stale#no_response')
             @disconnect(drop: true)
           else if @stale_count == 2
-            @emit('watchForStaleSocket#stale#intentional_bad_notification')
+            @emit('watchForStaleSocket#interval#stale#intentional_bad_notification')
 
             noti = new Notification()
             noti.alert  = "x"

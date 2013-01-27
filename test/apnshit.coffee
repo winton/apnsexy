@@ -70,7 +70,7 @@ describe 'Apnshit', ->
       errors          = []
       expected_errors = 0
       good            = []
-      sample          = 200
+      sample          = 100
       success         = []
 
       for i in [0..sample-1]
