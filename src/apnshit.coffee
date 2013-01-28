@@ -63,9 +63,6 @@ class Apnshit extends EventEmitter
       @stale_count++
 
       if @stale_count == 2
-        clearInterval(@stale_connection_timer)
-
-        delete @stale_connection_timer
         delete @stale_count
         
         @emit('checkForStaleConnection#stale')
@@ -86,11 +83,6 @@ class Apnshit extends EventEmitter
         resolve()
       else
         @emit('connect#connecting')
-
-        @stale_connection_timer ||= setInterval(
-          => @checkForStaleConnection(),
-          Math.floor(@options.timeout / 2)
-        )
 
         delete @bytes_read
         delete @bytes_written
@@ -126,6 +118,11 @@ class Apnshit extends EventEmitter
     notification._uid = @current_id++
     
     @notifications.push(notification)
+
+    @stale_connection_timer ||= setInterval(
+      => @checkForStaleConnection(),
+      Math.floor(@options.timeout / 2)
+    )
 
   events: [
     "checkForStaleConnection#start"
