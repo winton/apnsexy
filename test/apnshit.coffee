@@ -17,7 +17,7 @@ errors          = []
 expected_errors = 0
 good            = []
 notifications   = []
-sample          = 20
+sample          = 5
 
 describe 'Apnshit', ->
 
@@ -83,7 +83,7 @@ describe 'Apnshit', ->
     unless process.env.BAD
       it 'should recover from failure (mostly good)', (done) ->
         apns.once 'finish', =>
-          # errors.length.should.equal(expected_errors)
+          errors.length.should.equal(expected_errors)
           done()
 
         for i in [0..sample-1]
@@ -100,7 +100,7 @@ describe 'Apnshit', ->
 
       it 'should send multiple (all good)', (done) ->
         apns.once 'finish', =>
-          # errors.length.should.equal(expected_errors)
+          errors.length.should.equal(expected_errors)
           done()
 
         for i in [0..sample-1]
