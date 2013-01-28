@@ -1,7 +1,7 @@
 for key, value of require('../lib/apnshit/common')
   eval("var #{key} = value;")
 
-apnshit = require('../lib/apnshit2')
+apnshit = require('../lib/apnshit')
 fs      = require('fs')
 _       = require('underscore')
 
@@ -17,8 +17,7 @@ errors          = []
 expected_errors = 0
 good            = []
 notifications   = []
-sample          = 5
-success         = []
+sample          = 20
 
 describe 'Apnshit', ->
 
@@ -34,8 +33,8 @@ describe 'Apnshit', ->
         'connect#exists'
         'send#start'
         'keepSending'
-        # 'send#write'
-        # 'send#write#written'
+        'send#write'
+        'send#written'
       ]
       key           : config.key
       gateway       : "gateway.sandbox.push.apple.com"
@@ -45,23 +44,21 @@ describe 'Apnshit', ->
 
     apns.on 'error', (n) =>
       errors.push(n)
-      process.stdout.write('b')
+      process.stdout.write('.')
 
-    apns.on 'success', (n) =>
-      success.push(n)
-      process.stdout.write('g')
+  unless process.env.BAD
+    describe '#connect()', ->
+      it 'should connect', (done) ->
+        apns.connect().then(=> done())
 
-  describe '#connect()', ->
-    it 'should connect', (done) ->
-      apns.connect().then(=> done())
+    describe '#enqueue()', ->
+      it 'should send a notification', (done) ->
+        n = notification()
+        apns.once 'finish', => done()
+        apns.enqueue(n)
+        notifications.push(n)
 
-  describe '#send()', ->
-    it 'should send a notification', (done) ->
-      n = notification()
-      apns.once 'finish', => done()
-      apns.enqueue(n)
-      notifications.push(n)
-
+  describe '#enqueue()', ->
     it 'should recover from failure (mostly bad)', (done) ->
       apns.on 'send#write', (n) =>
         process.stdout.write(
@@ -69,11 +66,11 @@ describe 'Apnshit', ->
         )
 
       apns.once 'finish', =>
-        # errors.length.should.equal(expected_errors)
+        errors.length.should.equal(expected_errors)
         done()
 
       for i in [0..sample-1]
-        is_good = i == 1 || i == sample - 3
+        is_good = i == 1 || i == sample - 2
         n = notification(i, !is_good)
         if is_good
           good.push(n)
@@ -83,51 +80,48 @@ describe 'Apnshit', ->
           bad.push(n)
         apns.enqueue(n)
 
-    it 'should recover from failure (mostly good)', (done) ->
-      apns.once 'finish', =>
-        # errors.length.should.equal(expected_errors)
-        done()
+    unless process.env.BAD
+      it 'should recover from failure (mostly good)', (done) ->
+        apns.once 'finish', =>
+          # errors.length.should.equal(expected_errors)
+          done()
 
-      for i in [0..sample-1]
-        is_good = i == 1 || i == sample - 3
-        is_good = !is_good
-        n = notification(i, !is_good)
-        if is_good
+        for i in [0..sample-1]
+          is_good = i == 1 || i == sample - 3
+          is_good = !is_good
+          n = notification(i, !is_good)
+          if is_good
+            good.push(n)
+            notifications.push(n)
+          else
+            expected_errors += 1
+            bad.push(n)
+          apns.enqueue(n)
+
+      it 'should send multiple (all good)', (done) ->
+        apns.once 'finish', =>
+          # errors.length.should.equal(expected_errors)
+          done()
+
+        for i in [0..sample-1]
+          is_good = true
+          n = notification(i, !is_good)
           good.push(n)
           notifications.push(n)
-        else
-          expected_errors += 1
-          bad.push(n)
-        apns.enqueue(n)
-
-    it 'should send multiple (all good)', (done) ->
-      apns.once 'finish', =>
-        # errors.length.should.equal(expected_errors)
-        done()
-
-      for i in [0..sample-1]
-        is_good = true
-        n = notification(i, !is_good)
-        good.push(n)
-        notifications.push(n)
-        apns.enqueue(n)
+          apns.enqueue(n)
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
       console.log('')
 
       bad_diff  = _.filter bad,    (n) => errors.indexOf(n) == -1
-      good_diff = _.filter good,   (n) => success.indexOf(n) == -1
       bad_diff  = _.map bad_diff,  (n) => n.alert
-      good_diff = _.map good_diff, (n) => n.alert
 
       notifications = _.map notifications, (n) =>
         n.alert.replace(/\D+/g, '')
 
-      console.log(
-        "\nmissed success events:",
-        if good_diff.length then good_diff.join(", ") else "none!"
-      )
+      errors = _.map errors, (n) =>
+        n.alert.replace(/\D+/g, '')
 
       console.log(
         "\nmissed error events:",
@@ -255,7 +249,6 @@ notification = (index = null, bad = false) ->
       Math.floor(Math.random()*10000)
     }"
   noti.badge = 0
-  noti.sound = 'default'
   if bad
     noti.device = device_ids[index % 100]
   else
