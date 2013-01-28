@@ -9,6 +9,7 @@ class Apnshit extends EventEmitter
   constructor: (options) ->
     @current_id    = 0
     @notifications = []
+    @sent          = []
     
     @options =
       ca                   : null
@@ -22,13 +23,20 @@ class Apnshit extends EventEmitter
       passphrase           : null
       port                 : 2195
       reject_unauthorized  : true
+      timeout              : 5000
 
     _.extend(@options, options)
 
-    @on "error", ->
+    # EventEmitter requires something bound to error event
+    @on('error', ->)
 
     @attachDebugEvents() if @options.debug
     @keepSending()
+
+    setInterval(
+      => @checkForStaleConnection(),
+      Math.floor(@options.timeout / 2)
+    )
 
   attachDebugEvents: ->
     _.each @events, (e) =>
@@ -47,15 +55,48 @@ class Apnshit extends EventEmitter
         else
           @emit('debug', e)
 
+  checkForStaleConnection: ->
+    @emit('checkForStaleConnection#start')
+
+    if @socket
+      console.log('@socket.writable', @socket.writable)
+      console.log('@socket.bytesRead', @socket.socket.bytesRead)
+      console.log('@bytes_read', @bytes_read)
+      console.log('@socket.bytesWritten', @socket.socket.bytesWritten)
+      console.log('@bytes_written', @bytes_written)
+
+      stale = (
+        @socket.socket.bytesRead    == @bytes_read &&
+        @socket.socket.bytesWritten == @bytes_written
+      )
+
+      @stale_count ||= 0
+      @stale_count++
+
+      if @stale_count == 2
+        delete @stale_count
+        @emit('checkForStaleConnection#stale')
+        @emit('finish')
+
+      @bytes_read    = @socket.socket.bytesRead
+      @bytes_written = @socket.socket.bytesWritten
+
   connect: ->
     @emit('connect#start')
 
-    defer (resolve, reject) =>
+    unless @socket && @socket.writable
+      delete @connect_promise
+
+    @connect_promise ||= defer (resolve, reject) =>
       if @socket && @socket.writable
         @emit('connect#exists')
         resolve()
       else
         @emit('connect#connecting')
+
+        delete @bytes_read
+        delete @bytes_written
+        delete @stale_count
         
         socket_options =
           ca                : @options.ca
@@ -67,33 +108,55 @@ class Apnshit extends EventEmitter
     
         @socket = tls.connect @options.port, @options.gateway, socket_options, =>
           @emit("connect#connected")
-          delete @connect_promise
           resolve()
 
-        @socket.on "close", @socketError
-        @socket.on "data" , @socketData
-        @socket.on "error", @socketError
+        @socket.on "close",        => @socketError()
+        @socket.on "data" , (data) => @socketData(data)
+        @socket.on "error", (e)    => @socketError(e)
 
         @socket.setNoDelay(false)
         @socket.socket.connect @options.port, @options.gateway
 
   enqueue: (notification) ->
+    @emit("enqueue", notification)
+
+    @current_id = 0  if @current_id > 0xffffffff
+    notification._uid = @current_id++
+    
     @notifications.push(notification)
+
+  events: [
+    "checkForStaleConnection#start"
+    "checkForStaleConnection#stale"
+    "connect#start"
+    "connect#exists"
+    "connect#connecting"
+    "connect#connected"
+    "enqueue"
+    "keepSending"
+    "send#start"
+    "send#write"
+    "send#written"
+    "socketData#start"
+    "socketData#found_notification"
+    "socketError#start"
+  ]
 
   keepSending: ->
     process.nextTick(
-      => send() if !@sending && @notifications.length
+      =>
+        @emit("keepSending")
+        @send() if !@sending && @notifications.length
+        @keepSending()
     )
 
   send: ->
     notification = @notifications.shift()
+    @sent.push(notification)
 
     if notification
       @sending = true
       @emit("send#start", notification)
-
-      @current_id = 0  if @current_id > 0xffffffff
-      notification._uid = @current_id++
 
       data           = undefined
       encoding       = notification.encoding || "utf8"
@@ -125,7 +188,9 @@ class Apnshit extends EventEmitter
       
       @connect().then(
         =>
+          @emit("send#write", notification)
           @socket.write data, encoding, =>
+            @emit("send#written", notification)
             @sending = false
             notification._written = true
       )
@@ -136,16 +201,29 @@ class Apnshit extends EventEmitter
     error_code = data[0]
     identifier = data.readUInt32BE(2)
 
-    notification = _.find @notifications, (item, i) =>
+    notification = _.find @sent, (item, i) =>
       item._uid == identifier
     
     if notification
       @emit('socketData#found_notification', notification)
       @emit('error', notification)  if error_code == 8
 
-      @notifications = @notifications.slice(
-        @notifications.indexOf(notification) + 1
+      @notifications = @notifications.concat(
+        @sent.slice(
+          @sent.indexOf(notification) + 1
+        )
       )
 
-  socketError: ->
-    @notifications = _.reject(@notifications, (n) => n._written)
+      @sent = []
+      @socket.writable = false
+
+  socketError: (e) ->
+    @emit('socketError#start', e)
+    @notifications = @notifications.concat(
+      _.reject(@sent, (n) => n._written)
+    )
+
+module.exports = 
+  Apnshit     : Apnshit
+  Feedback    : Feedback
+  Notification: Notification
