@@ -63,6 +63,9 @@ class Apnshit extends EventEmitter
       @stale_count++
 
       if @stale_count == 2
+        clearInterval(@stale_connection_timer)
+        
+        delete @stale_connection_timer
         delete @stale_count
         
         @emit('checkForStaleConnection#stale')
