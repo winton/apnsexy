@@ -33,11 +33,6 @@ class Apnshit extends EventEmitter
     @attachDebugEvents() if @options.debug
     @keepSending()
 
-    setInterval(
-      => @checkForStaleConnection(),
-      Math.floor(@options.timeout / 2)
-    )
-
   attachDebugEvents: ->
     _.each @events, (e) =>
       @on e, (a, b) =>
@@ -68,7 +63,11 @@ class Apnshit extends EventEmitter
       @stale_count++
 
       if @stale_count == 2
+        clearInterval(@stale_connection_timer)
+
+        delete @stale_connection_timer
         delete @stale_count
+        
         @emit('checkForStaleConnection#stale')
         @emit('finish')
 
@@ -87,6 +86,11 @@ class Apnshit extends EventEmitter
         resolve()
       else
         @emit('connect#connecting')
+
+        @stale_connection_timer ||= setInterval(
+          => @checkForStaleConnection(),
+          Math.floor(@options.timeout / 2)
+        )
 
         delete @bytes_read
         delete @bytes_written

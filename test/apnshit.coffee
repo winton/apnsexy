@@ -36,8 +36,8 @@ describe 'Apnshit', ->
         'send#write'
         'send#written'
       ]
-      key           : config.key
-      gateway       : "gateway.sandbox.push.apple.com"
+      key    : config.key
+      gateway: "gateway.sandbox.push.apple.com"
     )
 
     apns.on 'debug', console.log
