@@ -37,12 +37,13 @@ describe 'Apnshit', ->
         'send#written'
       ]
       key    : config.key
-      gateway: "gateway.sandbox.push.apple.com"
+      gateway: "gateway.push.apple.com"
     )
 
     apns.on 'debug', console.log
 
     apns.on 'error', (n) =>
+      console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       errors.push(n)
       process.stdout.write('.')
 
@@ -55,85 +56,88 @@ describe 'Apnshit', ->
       it 'should send a notification', (done) ->
         n = notification()
         apns.once 'finish', => done()
-        apns.enqueue(n)
+        
+        for i in [0..20]
+          apns.enqueue(n)
+
         notifications.push(n)
 
-  describe '#enqueue()', ->
-    it 'should recover from failure (mostly bad)', (done) ->
-      apns.on 'send#write', (n) =>
-        process.stdout.write(
-          if n.alert.indexOf('Good') > -1 then 'g' else 'b'
-        )
+  # describe '#enqueue()', ->
+  #   it 'should recover from failure (mostly bad)', (done) ->
+  #     apns.on 'send#write', (n) =>
+  #       process.stdout.write(
+  #         if n.alert.indexOf('Good') > -1 then 'g' else 'b'
+  #       )
 
-      apns.once 'finish', =>
-        errors.length.should.equal(expected_errors)
-        done()
+  #     apns.once 'finish', =>
+  #       errors.length.should.equal(expected_errors)
+  #       done()
 
-      for i in [0..sample-1]
-        is_good = i == 1 || i == sample - 2
-        n = notification(i, !is_good)
-        if is_good
-          good.push(n)
-          notifications.push(n)
-        else
-          expected_errors += 1
-          bad.push(n)
-        apns.enqueue(n)
+  #     for i in [0..sample-1]
+  #       is_good = i == 1 || i == sample - 2
+  #       n = notification(i, !is_good)
+  #       if is_good
+  #         good.push(n)
+  #         notifications.push(n)
+  #       else
+  #         expected_errors += 1
+  #         bad.push(n)
+  #       apns.enqueue(n)
 
-    unless process.env.BAD
-      it 'should recover from failure (mostly good)', (done) ->
-        apns.once 'finish', =>
-          errors.length.should.equal(expected_errors)
-          done()
+  #   unless process.env.BAD
+  #     it 'should recover from failure (mostly good)', (done) ->
+  #       apns.once 'finish', =>
+  #         errors.length.should.equal(expected_errors)
+  #         done()
 
-        for i in [0..sample-1]
-          is_good = i == 1 || i == sample - 3
-          is_good = !is_good
-          n = notification(i, !is_good)
-          if is_good
-            good.push(n)
-            notifications.push(n)
-          else
-            expected_errors += 1
-            bad.push(n)
-          apns.enqueue(n)
+  #       for i in [0..sample-1]
+  #         is_good = i == 1 || i == sample - 3
+  #         is_good = !is_good
+  #         n = notification(i, !is_good)
+  #         if is_good
+  #           good.push(n)
+  #           notifications.push(n)
+  #         else
+  #           expected_errors += 1
+  #           bad.push(n)
+  #         apns.enqueue(n)
 
-      it 'should send multiple (all good)', (done) ->
-        apns.once 'finish', =>
-          errors.length.should.equal(expected_errors)
-          done()
+  #     it 'should send multiple (all good)', (done) ->
+  #       apns.once 'finish', =>
+  #         errors.length.should.equal(expected_errors)
+  #         done()
 
-        for i in [0..sample-1]
-          is_good = true
-          n = notification(i, !is_good)
-          good.push(n)
-          notifications.push(n)
-          apns.enqueue(n)
+  #       for i in [0..sample-1]
+  #         is_good = true
+  #         n = notification(i, !is_good)
+  #         good.push(n)
+  #         notifications.push(n)
+  #         apns.enqueue(n)
 
-  describe 'verify notifications', ->
-    it 'should have sent these notifications', (done) ->
-      console.log('')
+  # describe 'verify notifications', ->
+  #   it 'should have sent these notifications', (done) ->
+  #     console.log('')
 
-      bad_diff  = _.filter bad,    (n) => errors.indexOf(n) == -1
-      bad_diff  = _.map bad_diff,  (n) => n.alert
+  #     bad_diff  = _.filter bad,    (n) => errors.indexOf(n) == -1
+  #     bad_diff  = _.map bad_diff,  (n) => n.alert
 
-      notifications = _.map notifications, (n) =>
-        n.alert.replace(/\D+/g, '')
+  #     notifications = _.map notifications, (n) =>
+  #       n.alert.replace(/\D+/g, '')
 
-      errors = _.map errors, (n) =>
-        n.alert.replace(/\D+/g, '')
+  #     errors = _.map errors, (n) =>
+  #       n.alert.replace(/\D+/g, '')
 
-      console.log(
-        "\nmissed error events:",
-        if bad_diff.length then bad_diff.join(", ") else "none!"
-      )
-      console.log("\nsample size: #{sample}")
-      console.log("\ndrops: #{drops}")
-      console.log("\n#{errors.length} errors / #{expected_errors} expected")
-      console.log("\n#{notifications.length} notifications:")
-      console.log("\n#{notifications.join("\n")}")
+  #     console.log(
+  #       "\nmissed error events:",
+  #       if bad_diff.length then bad_diff.join(", ") else "none!"
+  #     )
+  #     console.log("\nsample size: #{sample}")
+  #     console.log("\ndrops: #{drops}")
+  #     console.log("\n#{errors.length} errors / #{expected_errors} expected")
+  #     console.log("\n#{notifications.length} notifications:")
+  #     console.log("\n#{notifications.join("\n")}")
 
-      done()
+  #     done()
 
 # Helpers
 
@@ -242,15 +246,23 @@ notification = (index = null, bad = false) ->
   ]
 
   noti = new Notification()
-  noti.alert =
-    "#{
-      if bad then "Bad" else "Good"
-    } notification: #{
-      Math.floor(Math.random()*10000)
-    }"
+
+  # noti.alert =
+  #   "#{
+  #     if bad then "Bad" else "Good"
+  #   } notification: #{
+  #     Math.floor(Math.random()*10000)
+  #   }"
+  # noti.badge = 0
+  # if bad
+  #   noti.device = device_ids[index % 100]
+  # else
+  #   noti.device = config.device_id
+
+  noti.device = "7a4be145692158ee5a1f275cccc7fd83fed7f744c9837f04c5db23e104bea391"
+  noti.alert = "Sharks: Dan Boyle Expected to Return Tonight vs. Oilers After Missing 1 Game Due to Illness -- Details in Team Stream"
+  noti.payload = { url: "/", tag: "nfl" }
   noti.badge = 0
-  if bad
-    noti.device = device_ids[index % 100]
-  else
-    noti.device = config.device_id
+  noti.sound = "default"
+
   noti
