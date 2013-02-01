@@ -23,7 +23,7 @@ class Apnshit extends EventEmitter
       passphrase           : null
       port                 : 2195
       reject_unauthorized  : true
-      timeout              : 5000
+      timeout              : 3000
 
     _.extend(@options, options)
 
