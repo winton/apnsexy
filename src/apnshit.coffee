@@ -7,49 +7,49 @@ Notification = require './apnshit/notification'
 class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @resetVars()
-
-    @options =
-      ca                   : null
-      cert                 : 'cert.pem'
-      debug                : false
-      debug_ignore         : []
-      gateway              : 'gateway.push.apple.com'
-      infinite_resend_limit: 10
-      key                  : 'key.pem'
-      passphrase           : null
-      port                 : 2195
-      reject_unauthorized  : true
-      timeout              : 2000
-
-    _.extend(@options, options)
+    @options = _.extend(
+      ca          : null
+      cert        : 'cert.pem'
+      debug       : false
+      debug_ignore: []
+      gateway     : 'gateway.push.apple.com'
+      key         : 'key.pem'
+      passphrase  : null
+      port        : 2195
+      secure_cert : true
+      timeout     : 2000
+      
+      options
+    )
 
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
-    @attachDebugEvents() if @options.debug
+    @resetVars()
+    @attachDebugEvents()
     @keepSending()
 
   attachDebugEvents: ->
-    _.each @events, (e) =>
-      @on e, (a, b) =>
-        return if @options.debug_ignore.indexOf(e) >= 0
-        if e == 'send#write'
-          @emit('debug', e, a.alert)
-        else if e == 'socketData#invalid_token#notification'
-          @emit('debug', e, a.alert)
-        else if e == "disconnect#drop#resend"
-          @emit('debug', e, a.length)
-        else if e == "socketData#start"
-          @emit('debug', e, a[0])
-        else if e == "socket#error"
-          @emit('debug', e, a)
-        else if e == "socketData#found_notification"
-          @emit('debug', e, a.device)
-        else if e == "send#start"
-          @emit('debug', e, a.device)
-        else
-          @emit('debug', e)
+    if @options.debug
+      _.each @events, (e) =>
+        @on e, (a, b) =>
+          return  if @options.debug_ignore.indexOf(e) >= 0
+          if e == 'send#write'
+            @emit('debug', e, a.alert)
+          else if e == 'socketData#invalid_token#notification'
+            @emit('debug', e, a.alert)
+          else if e == "disconnect#drop#resend"
+            @emit('debug', e, a.length)
+          else if e == "socketData#start"
+            @emit('debug', e, a[0])
+          else if e == "socket#error"
+            @emit('debug', e, a)
+          else if e == "socketData#found_notification"
+            @emit('debug', e, a.device)
+          else if e == "send#start"
+            @emit('debug', e, a.device)
+          else
+            @emit('debug', e)
 
   checkForStaleConnection: ->
     @emit('checkForStaleConnection#start')
@@ -86,7 +86,7 @@ class Apnshit extends EventEmitter
           cert              : fs.readFileSync(@options.cert)
           key               : fs.readFileSync(@options.key)
           passphrase        : @options.passphrase
-          rejectUnauthorized: @options.reject_unauthorized
+          rejectUnauthorized: @options.secure_cert
           socket            : new net.Stream()
     
         setTimeout(
@@ -103,6 +103,10 @@ class Apnshit extends EventEmitter
             @socket.socket.connect(@options.port, @options.gateway)
           100
         )
+
+  killSocket: ->
+    @socket.removeAllListeners()
+    @socket.writable = false
 
   enqueue: (notification) ->
     @emit("enqueue", notification)
@@ -172,36 +176,13 @@ class Apnshit extends EventEmitter
       @index++
 
       @emit("send#start", notification)
-
-      data           = undefined
-      encoding       = notification.encoding || "utf8"
-      message        = JSON.stringify(notification)
-      message_length = Buffer.byteLength(message, encoding)
-      position       = 0
-      token          = new Buffer(notification.device.replace(/\s/g, ""), "hex")
-
-      data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
-      data[position] = 1
-      position++
-      data.writeUInt32BE notification._uid, position
-      position += 4
-      data.writeUInt32BE notification.expiry, position
-      position += 4
-
-      data.writeUInt16BE token.length, position
-      position += 2
-      position += token.copy(data, position, 0)
-      
-      data.writeUInt16BE message_length, position
-      position += 2
-      position += data.write(message, position, encoding)
       
       @connect().then(
         =>
           @emit("send#write", notification)
           
           if @socket.writable
-            @socket.write data, encoding, =>
+            @socket.write notification.data(), notification.encoding, =>
               @emit("send#written", notification)
 
               @sending    = false
@@ -229,17 +210,15 @@ class Apnshit extends EventEmitter
       @emit('socketData#found_notification', notification)
       @emit('error', notification)  if error_code == 8
 
-      @socket.removeAllListeners()
-      @socket.writable = false
+      @killSocket()
 
   socketError: (e) ->
     @emit('socketError#start', e)
 
-    @error_index     = @sent_index + 1 unless @error_index?
+    @error_index = @sent_index + 1  unless @error_index?
     console.log('socketError#@error_index', @error_index)
 
-    @socket.removeAllListeners()
-    @socket.writable = false
+    @killSocket()
 
 module.exports = 
   Apnshit     : Apnshit

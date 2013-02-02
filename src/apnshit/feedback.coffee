@@ -7,16 +7,16 @@ module.exports = class Feedback extends EventEmitter
     @on "error", ->
 
     @options =
-      address            : "feedback.push.apple.com"
-      ca                 : null
-      cert               : "cert.pem"
-      debug              : false
-      debug_ignore       : []
-      interval           : 60
-      key                : "key.pem"
-      passphrase         : null
-      port               : 2196
-      reject_unauthorized: true
+      address     : "feedback.push.apple.com"
+      ca          : null
+      cert        : "cert.pem"
+      debug       : false
+      debug_ignore: []
+      interval    : 60
+      key         : "key.pem"
+      passphrase  : null
+      port        : 2196
+      secure_cert : true
 
     _.extend @options, options
 
@@ -43,7 +43,7 @@ module.exports = class Feedback extends EventEmitter
           cert              : fs.readFileSync(@options.cert)
           key               : fs.readFileSync(@options.key)
           passphrase        : @options.passphrase
-          rejectUnauthorized: @options.reject_unauthorized
+          rejectUnauthorized: @options.secure_cert
 
         @socket = tls.connect @options.port, @options.address, socket_options, =>
           @emit("connect#connected")
