@@ -48,7 +48,7 @@ class Apnshit extends EventEmitter
         else if e == "socket#error"
           @emit('debug', e, a)
         else if e == "socketData#found_notification"
-          @emit('debug', e, a)
+          @emit('debug', e, a.device_id)
         else if e == "send#start"
           @emit('debug', e, a)
         else
