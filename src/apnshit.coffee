@@ -7,11 +7,8 @@ Notification = require './apnshit/notification'
 class Apnshit extends EventEmitter
   
   constructor: (options) ->
-    @current_id    = 0
-    @index         = 0
-    @notifications = []
-    @sent_index    = 0
-    
+    @resetVars()
+
     @options =
       ca                   : null
       cert                 : 'cert.pem'
@@ -23,7 +20,7 @@ class Apnshit extends EventEmitter
       passphrase           : null
       port                 : 2195
       reject_unauthorized  : true
-      timeout              : 3000
+      timeout              : 2000
 
     _.extend(@options, options)
 
@@ -57,26 +54,17 @@ class Apnshit extends EventEmitter
   checkForStaleConnection: ->
     @emit('checkForStaleConnection#start')
 
-    if @socket
-      stale = (
-        @socket.socket.bytesRead    == @bytes_read &&
-        @socket.socket.bytesWritten == @bytes_written
-      )
+    @stale_index ||= @sent_index
+    @stale_count ||= 0
 
-      @stale_count ||= 0
-      @stale_count++
+    @stale_count++  if @stale_index == @sent_index
 
-      if @stale_count >= 2
-        clearInterval(@stale_connection_timer)
-        
-        delete @stale_connection_timer
-        delete @stale_count
-        
-        @emit('checkForStaleConnection#stale')
-        @emit('finish')
-
-      @bytes_read    = @socket.socket.bytesRead
-      @bytes_written = @socket.socket.bytesWritten
+    if @stale_count >= 2
+      clearInterval(@stale_connection_timer)
+      @resetVars()
+      
+      @emit('checkForStaleConnection#stale')
+      @emit('finish')
 
   connect: ->
     @emit('connect#start')
@@ -91,9 +79,7 @@ class Apnshit extends EventEmitter
       else
         @emit('connect#connecting')
 
-        delete @bytes_read
-        delete @bytes_written
-        delete @stale_count
+        @resetVars(stale_only: true)
         
         socket_options =
           ca                : @options.ca
@@ -121,15 +107,15 @@ class Apnshit extends EventEmitter
   enqueue: (notification) ->
     @emit("enqueue", notification)
 
-    @current_id = 0  if @current_id > 0xffffffff
-    notification._uid = @current_id++
+    @uid = 0  if @uid > 0xffffffff
+    notification._uid = @uid++
     
     @notifications.push(notification)
 
-    # @stale_connection_timer ||= setInterval(
-    #   => @checkForStaleConnection(),
-    #   Math.floor(@options.timeout / 2)
-    # )
+    @stale_connection_timer ||= setInterval(
+      => @checkForStaleConnection(),
+      Math.floor(@options.timeout)
+    )
 
   events: [
     "checkForStaleConnection#start"
@@ -162,6 +148,17 @@ class Apnshit extends EventEmitter
         
         @keepSending()
     )
+
+  resetVars: (options = {})->
+    unless options.stale_only?
+      @index         = 0
+      @notifications = []
+      @sent_index    = 0
+      @uid           = 0
+
+    delete @stale_connection_timer
+    delete @stale_count
+    delete @stale_index
 
   send: ->
     notification = @notifications[@index]
