@@ -33,7 +33,7 @@ module.exports = class Debug extends EventEmitter
     @instance.emit.apply(@instance, params)
 
   extractInfo: (param) ->
-    return  unless param
+    return  unless param?
     if param.alert
       alert : param.alert
       device: param.device
