@@ -8,15 +8,15 @@ class Apnshit extends EventEmitter
   
   constructor: (options) ->
     @current_id    = 0
+    @index         = 0
     @notifications = []
-    @sent          = []
+    @sent_index    = 0
     
     @options =
       ca                   : null
       cert                 : 'cert.pem'
       debug                : false
       debug_ignore         : []
-      enhanced             : true
       gateway              : 'gateway.push.apple.com'
       infinite_resend_limit: 10
       key                  : 'key.pem'
@@ -48,9 +48,9 @@ class Apnshit extends EventEmitter
         else if e == "socket#error"
           @emit('debug', e, a)
         else if e == "socketData#found_notification"
-          @emit('debug', e, a.device_id)
+          @emit('debug', e, a.device)
         else if e == "send#start"
-          @emit('debug', e, a.device_id)
+          @emit('debug', e, a.device)
         else
           @emit('debug', e)
 
@@ -126,10 +126,10 @@ class Apnshit extends EventEmitter
     
     @notifications.push(notification)
 
-    @stale_connection_timer ||= setInterval(
-      => @checkForStaleConnection(),
-      Math.floor(@options.timeout / 2)
-    )
+    # @stale_connection_timer ||= setInterval(
+    #   => @checkForStaleConnection(),
+    #   Math.floor(@options.timeout / 2)
+    # )
 
   events: [
     "checkForStaleConnection#start"
@@ -152,15 +152,28 @@ class Apnshit extends EventEmitter
     process.nextTick(
       =>
         @emit("keepSending")
-        @send() if !@sending && @notifications.length
+        
+        if @error_index?
+          @index = @error_index + 1
+          delete @error_index
+
+        if !@sending && @index != @notifications.length
+          @send()
+        
         @keepSending()
     )
 
   send: ->
-    notification = @notifications.shift()
+    notification = @notifications[@index]
 
     if notification
+      console.log('send#@index', @index)
+
+      index    = @index
       @sending = true
+
+      @index++
+
       @emit("send#start", notification)
 
       data           = undefined
@@ -170,19 +183,14 @@ class Apnshit extends EventEmitter
       position       = 0
       token          = new Buffer(notification.device.replace(/\s/g, ""), "hex")
 
-      if @options.enhanced
-        data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
-        data[position] = 1
-        position++
-        data.writeUInt32BE notification._uid, position
-        position += 4
-        data.writeUInt32BE notification.expiry, position
-        position += 4
-      else
-        data = new Buffer(1 + 2 + token.length + 2 + message_length)
-        data[position] = 0
-        position++
-      
+      data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
+      data[position] = 1
+      position++
+      data.writeUInt32BE notification._uid, position
+      position += 4
+      data.writeUInt32BE notification.expiry, position
+      position += 4
+
       data.writeUInt16BE token.length, position
       position += 2
       position += token.copy(data, position, 0)
@@ -194,16 +202,14 @@ class Apnshit extends EventEmitter
       @connect().then(
         =>
           @emit("send#write", notification)
-          @sent.push(notification)
           
           if @socket.writable
             @socket.write data, encoding, =>
               @emit("send#written", notification)
-              @sending = false
-              notification._written = true
+
+              @sending    = false
+              @sent_index = index
           else
-            @notifications.unshift(notification)
-            @sent = _.reject(@sent, (n) => n._uid == notification._uid)
             @sending = false
       )
 
@@ -213,32 +219,29 @@ class Apnshit extends EventEmitter
     error_code = data[0]
     identifier = data.readUInt32BE(2)
 
-    notification = _.find @sent, (item, i) =>
-      item._uid == identifier
+    delete @error_index
+
+    _.each @notifications, (item, i) =>
+      if item._uid == identifier
+        @error_index = i
     
-    if notification
+    if @error_index?
+      console.log('socketData#@error_index', @error_index)
+      notification = @notifications[@error_index]
+      
       @emit('socketData#found_notification', notification)
       @emit('error', notification)  if error_code == 8
 
-      @notifications = @notifications.concat(
-        @sent.slice(
-          @sent.indexOf(notification) + 1
-        )
-      )
-
-      console.log('@notifications', @notifications.length)
-
-      _.each(@notifications, (n) => delete n._written)
-
-      @sent = []
+      @socket.removeAllListeners()
       @socket.writable = false
 
   socketError: (e) ->
     @emit('socketError#start', e)
 
-    @notifications = @notifications.concat(
-      _.reject(@sent, (n) => n._written)
-    )
+    @error_index     = @sent_index + 1 unless @error_index?
+    console.log('socketError#@error_index', @error_index)
+
+    @socket.removeAllListeners()
     @socket.writable = false
 
 module.exports = 
