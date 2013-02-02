@@ -50,7 +50,7 @@ class Apnshit extends EventEmitter
         else if e == "socketData#found_notification"
           @emit('debug', e, a.device_id)
         else if e == "send#start"
-          @emit('debug', e, a)
+          @emit('debug', e, a.device_id)
         else
           @emit('debug', e)
 
@@ -161,7 +161,7 @@ class Apnshit extends EventEmitter
 
     if notification
       @sending = true
-      @emit("send#start", JSON.stringify(notification))
+      @emit("send#start", notification)
 
       data           = undefined
       encoding       = notification.encoding || "utf8"
