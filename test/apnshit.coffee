@@ -29,12 +29,14 @@ describe 'Apnshit', ->
       cert          : config.cert
       debug         : true
       debug_ignore  : [
+        'enqueue'
         'connect#start'
         'connect#exists'
         'send#start'
         'keepSending'
         'send#write'
         'send#written'
+        'socketData#start'
       ]
       key    : config.key
       gateway: "gateway.sandbox.push.apple.com"

@@ -1,12 +1,13 @@
 for key, value of require('./common')
   eval("var #{key} = value;")
 
+Debug = require './debug'
+
 module.exports = class Feedback extends EventEmitter
   
   constructor: (options) ->
-    @on "error", ->
 
-    @options =
+    @options = _.extend(
       address     : "feedback.push.apple.com"
       ca          : null
       cert        : "cert.pem"
@@ -18,25 +19,25 @@ module.exports = class Feedback extends EventEmitter
       port        : 2196
       secure_cert : true
 
-    _.extend @options, options
+      options
+    )
 
-    if @options.debug
-      _.each @events, (e) =>
-        @on e, (a, b) =>
-          return if @options.debug_ignore.indexOf(e) >= 0
-          @emit('debug', e)
+    # EventEmitter requires something bound to error event
+    @on('error', ->)
+
+    new Debug(@)  if @options.debug
 
     @connect().then(=> @startInterval())
 
   connect: ->
-    @emit('connect#start', @connect_promise)
+    @debug('connect#start', @connect_promise)
 
     @connect_promise ||= defer (resolve, reject) =>
       if @socket && @socket.writable
-        @emit('connect#exists')
+        @debug('connect#exists')
         resolve()
       else
-        @emit('connect#connecting')
+        @debug('connect#connecting')
         @connecting = true
         socket_options =
           ca                : @options.ca
@@ -50,7 +51,7 @@ module.exports = class Feedback extends EventEmitter
           @options.address
           socket_options
           =>
-            @emit("connect#connected")
+            @debug("connect#connected")
             resolve()
             delete @connect_promise
         )
@@ -59,27 +60,11 @@ module.exports = class Feedback extends EventEmitter
 
         @socket.on "data", (data) => @socketData(data)
         @socket.on "error",   (e) =>
-          @emit("socket#error", e)
+          @debug("socket#error", e)
           @disconnect(drop: true)
 
-  events: [
-    'connect#start'
-    'connect#exists'
-    'connect#connecting'
-    'connect#connected'
-    'disconnect#start'
-    'disconnect#drop'
-    'disconnect#finish'
-    'socket#error'
-    'socketData#start'
-    'socketData#received_packet'
-    'socketData#parsed_token'
-    'startInterval#start'
-    'startInterval#interval_start'
-  ]
-
   disconnect: (options = {}) ->
-    @emit("disconnect#start", options)
+    @debug("disconnect#start", options)
 
     delete @connect_promise
 
@@ -89,20 +74,20 @@ module.exports = class Feedback extends EventEmitter
     clearInterval(@interval) if @interval
 
     if options.drop
-      @emit("disconnect#drop")
+      @debug("disconnect#drop")
       @connect().then(=> @startInterval())
     else
-      @emit("disconnect#finish")
+      @debug("disconnect#finish")
       @emit("finish")
 
   socketData: (data) ->
-    @emit('socketData#start', data)
+    @debug('socketData#start', data)
 
     time         = 0
     token_length = 0
     token        = null
 
-    @emit('socketData#received_packet', data)
+    @debug('socketData#received_packet', data)
     
     new_buffer = new Buffer(@read_buffer.length + data.length)
     @read_buffer.copy(new_buffer)
@@ -121,18 +106,18 @@ module.exports = class Feedback extends EventEmitter
 
       token = token.toString("hex")
 
-      @emit('socketData#parsed_token', time, token)
+      @debug('socketData#parsed_token', time, token)
       @emit('feedback', time, token)
 
       @read_buffer = @read_buffer.slice(6 + token_length)
 
   startInterval: =>
-    @emit('startInterval#start')
+    @debug('startInterval#start')
 
-    clearInterval(@interval) if @interval
+    clearInterval(@interval)  if @interval
     @interval = setInterval(
       =>
-        @emit('startInterval#interval_start')
+        @debug('startInterval#interval_start')
 
         if @socket && !@socket.writable
           @disconnect(drop: true)

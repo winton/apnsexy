@@ -1,6 +1,7 @@
 for key, value of require('./apnshit/common')
   eval("var #{key} = value;")
 
+Debug        = require './apnshit/debug'
 Feedback     = require './apnshit/feedback'
 Notification = require './apnshit/notification'
 
@@ -26,38 +27,13 @@ class Apnshit extends EventEmitter
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
+    new Debug(@)  if @options.debug
+
     @resetVars()
-    @attachDebugEvents()
     @keepSending()
 
-  attachDebugEvents: ->
-    return unless @options.debug
-
-    _.each(
-      @events
-      (e) =>
-        @on e, (a, b) =>
-          return  if @options.debug_ignore.indexOf(e) >= 0
-          if e == 'send#write'
-            @emit('debug', e, a.alert)
-          else if e == 'socketData#invalid_token#notification'
-            @emit('debug', e, a.alert)
-          else if e == "disconnect#drop#resend"
-            @emit('debug', e, a.length)
-          else if e == "socketData#start"
-            @emit('debug', e, a[0])
-          else if e == "socket#error"
-            @emit('debug', e, a)
-          else if e == "socketData#found_notification"
-            @emit('debug', e, a.device)
-          else if e == "send#start"
-            @emit('debug', e, a.device)
-          else
-            @emit('debug', e)
-    )
-
   checkForStaleConnection: ->
-    @emit('checkForStaleConnection#start')
+    @debug('checkForStaleConnection#start')
 
     @stale_index ||= @sent_index
     @stale_count ||= 0
@@ -68,23 +44,22 @@ class Apnshit extends EventEmitter
       clearInterval(@stale_connection_timer)
       @resetVars()
       
-      @emit('checkForStaleConnection#stale')
+      @debug('checkForStaleConnection#stale')
       @emit('finish')
 
   connect: ->
-    @emit('connect#start')
+    @debug('connect#start')
 
     unless @socket && @socket.writable
       delete @connect_promise
 
     @connect_promise ||= defer (resolve, reject) =>
       if @socket && @socket.writable
-        @emit('connect#exists')
+        @debug('connect#exists')
         resolve()
       else
-        @emit('connect#connecting')
-
-        @resetVars(stale_only: true)
+        @debug('connect#connecting')
+        @resetVars(connecting: true)
         
         socket_options =
           ca                : @options.ca
@@ -101,7 +76,7 @@ class Apnshit extends EventEmitter
               @options.gateway
               socket_options
               =>
-                @emit("connect#connected")
+                @debug("connect#connected")
                 resolve()
             )
 
@@ -122,7 +97,7 @@ class Apnshit extends EventEmitter
     @socket.writable = false
 
   enqueue: (notification) ->
-    @emit("enqueue", notification)
+    @debug("enqueue", notification)
 
     @uid = 0  if @uid > 0xffffffff
     notification._uid = @uid++
@@ -134,27 +109,10 @@ class Apnshit extends EventEmitter
       @options.timeout
     )
 
-  events: [
-    "checkForStaleConnection#start"
-    "checkForStaleConnection#stale"
-    "connect#start"
-    "connect#exists"
-    "connect#connecting"
-    "connect#connected"
-    "enqueue"
-    "keepSending"
-    "send#start"
-    "send#write"
-    "send#written"
-    "socketData#start"
-    "socketData#found_notification"
-    "socketError#start"
-  ]
-
   keepSending: ->
     process.nextTick(
       =>
-        @emit("keepSending")
+        @debug("keepSending")
         
         if @error_index?
           @index = @error_index + 1
@@ -167,13 +125,15 @@ class Apnshit extends EventEmitter
     )
 
   resetVars: (options = {})->
-    unless options.stale_only?
+    unless options.connecting?
+      delete @error_index
+      delete @stale_connection_timer
+
       @index         = 0
       @notifications = []
       @sent_index    = 0
       @uid           = 0
 
-    delete @stale_connection_timer
     delete @stale_count
     delete @stale_index
 
@@ -181,25 +141,25 @@ class Apnshit extends EventEmitter
     notification = @notifications[@index]
 
     if notification
-      console.log('send#@index', @index)
+      @debug('send#@index', @index)
 
       index    = @index
       @sending = true
 
       @index++
 
-      @emit("send#start", notification)
+      @debug("send#start", notification)
       
       @connect().then(
         =>
-          @emit("send#write", notification)
+          @debug("send#write", notification)
           
           if @socket.writable
             @socket.write(
               notification.data()
               notification.encoding
               =>
-                @emit("send#written", notification)
+                @debug("send#written", notification)
 
                 @sending    = false
                 @sent_index = index
@@ -209,10 +169,14 @@ class Apnshit extends EventEmitter
       )
 
   socketData: (data) ->
-    @emit('socketData#start', data)
-
     error_code = data[0]
     identifier = data.readUInt32BE(2)
+
+    @debug(
+      'socketData#start'
+      error_code: error_code
+      identifier: identifier
+    )
 
     delete @error_index
 
@@ -221,19 +185,19 @@ class Apnshit extends EventEmitter
         @error_index = i
     
     if @error_index?
-      console.log('socketData#@error_index', @error_index)
+      @debug('socketData#@error_index', @error_index)
       notification = @notifications[@error_index]
       
-      @emit('socketData#found_notification', notification)
+      @debug('socketData#found_notification', notification)
       @emit('error', notification)  if error_code == 8
 
       @killSocket()
 
   socketError: (e) ->
-    @emit('socketError#start', e)
+    @debug('socketError#start', e)
 
     @error_index = @sent_index + 1  unless @error_index?
-    console.log('socketError#@error_index', @error_index)
+    @debug('socketError#@error_index', @error_index)
 
     @killSocket()
 
