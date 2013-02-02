@@ -7,6 +7,7 @@ Notification = require './apnshit/notification'
 class Apnshit extends EventEmitter
   
   constructor: (options) ->
+
     @options = _.extend(
       ca          : null
       cert        : 'cert.pem'
@@ -30,8 +31,11 @@ class Apnshit extends EventEmitter
     @keepSending()
 
   attachDebugEvents: ->
-    if @options.debug
-      _.each @events, (e) =>
+    return unless @options.debug
+
+    _.each(
+      @events
+      (e) =>
         @on e, (a, b) =>
           return  if @options.debug_ignore.indexOf(e) >= 0
           if e == 'send#write'
@@ -50,6 +54,7 @@ class Apnshit extends EventEmitter
             @emit('debug', e, a.device)
           else
             @emit('debug', e)
+    )
 
   checkForStaleConnection: ->
     @emit('checkForStaleConnection#start')
@@ -91,16 +96,24 @@ class Apnshit extends EventEmitter
     
         setTimeout(
           =>
-            @socket = tls.connect @options.port, @options.gateway, socket_options, =>
-              @emit("connect#connected")
-              resolve()
+            @socket = tls.connect(
+              @options.port
+              @options.gateway
+              socket_options
+              =>
+                @emit("connect#connected")
+                resolve()
+            )
 
             @socket.on "close",        => @socketError()
             @socket.on "data" , (data) => @socketData(data)
             @socket.on "error", (e)    => @socketError(e)
 
             @socket.setNoDelay(false)
-            @socket.socket.connect(@options.port, @options.gateway)
+            @socket.socket.connect(
+              @options.port
+              @options.gateway
+            )
           100
         )
 
@@ -117,8 +130,8 @@ class Apnshit extends EventEmitter
     @notifications.push(notification)
 
     @stale_connection_timer ||= setInterval(
-      => @checkForStaleConnection(),
-      Math.floor(@options.timeout)
+      => @checkForStaleConnection()
+      @options.timeout
     )
 
   events: [
@@ -182,11 +195,15 @@ class Apnshit extends EventEmitter
           @emit("send#write", notification)
           
           if @socket.writable
-            @socket.write notification.data(), notification.encoding, =>
-              @emit("send#written", notification)
+            @socket.write(
+              notification.data()
+              notification.encoding
+              =>
+                @emit("send#written", notification)
 
-              @sending    = false
-              @sent_index = index
+                @sending    = false
+                @sent_index = index
+            )
           else
             @sending = false
       )

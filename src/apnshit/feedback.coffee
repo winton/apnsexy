@@ -45,10 +45,15 @@ module.exports = class Feedback extends EventEmitter
           passphrase        : @options.passphrase
           rejectUnauthorized: @options.secure_cert
 
-        @socket = tls.connect @options.port, @options.address, socket_options, =>
-          @emit("connect#connected")
-          resolve()
-          delete @connect_promise
+        @socket = tls.connect(
+          @options.port
+          @options.address
+          socket_options
+          =>
+            @emit("connect#connected")
+            resolve()
+            delete @connect_promise
+        )
 
         @read_buffer = new Buffer(0)
 
