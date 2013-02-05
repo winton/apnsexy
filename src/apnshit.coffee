@@ -35,8 +35,10 @@ class Apnshit extends EventEmitter
   checkForStaleConnection: ->
     @debug('checkForStaleConnection#start')
 
-    @stale_index ||= @sent_index
     @stale_count ||= 0
+
+    if !@stale_index || @stale_index < @sent_index
+      @stale_index = @sent_index
 
     @stale_count++  if @stale_index == @sent_index
 
@@ -89,7 +91,7 @@ class Apnshit extends EventEmitter
               @options.port
               @options.gateway
             )
-          100
+          10
         )
 
   killSocket: ->
