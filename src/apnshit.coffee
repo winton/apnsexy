@@ -39,6 +39,7 @@ class Apnshit extends EventEmitter
 
     if !@stale_index || @stale_index < @sent_index
       @stale_index = @sent_index
+      @stale_count = 0
 
     @stale_count++  if @stale_index == @sent_index
 
