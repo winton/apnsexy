@@ -53,11 +53,11 @@ class Apnshit extends EventEmitter
   connect: ->
     @debug('connect#start')
 
-    unless @socket && @socket.writable
+    unless @socket? && @socket.writable
       delete @connect_promise
 
     @connect_promise ||= defer (resolve, reject) =>
-      if @socket && @socket.writable
+      if @socket? && @socket.writable
         @debug('connect#exists')
         resolve()
       else
@@ -158,7 +158,7 @@ class Apnshit extends EventEmitter
           @debug("send#write", notification)
           
           if @socket.writable
-            @socket.write(
+            written = @socket.write(
               notification.data()
               notification.encoding
               =>
@@ -167,6 +167,8 @@ class Apnshit extends EventEmitter
                 @sending    = false
                 @sent_index = index
             )
+            if !written?
+              @debug("send#write_failed")
           else
             @sending = false
       )
