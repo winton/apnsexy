@@ -44,5 +44,5 @@ module.exports = class Notification
     @payload.aps.badge = @badge  if @badge?
     @payload.aps.sound = @sound  if @sound?
     @payload.aps.alert = @alert  if @alert?
-    @payload.aps["content-available"] = 1  if @newsstandAvailable
+    @payload.aps["content-available"] = 1  if @newsstandAvailable?
     @payload
