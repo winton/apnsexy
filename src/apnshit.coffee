@@ -64,13 +64,13 @@ class Apnshit extends EventEmitter
   connect: ->
     @debug('connect#start')
 
-    if !@connecting && (!@socket || !@socket.writable)
+    if !@connecting? && (!@socket? || !@socket.writable)
       delete @connect_promise
       delete @sent_index
       @connect_index = @index - 1
 
     @connect_promise ||= defer (resolve, reject) =>
-      if @socket && @socket.writable
+      if @socket? && @socket.writable
         @debug('connect#exists')
         resolve()
       else

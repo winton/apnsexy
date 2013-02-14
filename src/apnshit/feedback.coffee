@@ -33,7 +33,7 @@ module.exports = class Feedback extends EventEmitter
     @debug('connect#start', @connect_promise)
 
     @connect_promise ||= defer (resolve, reject) =>
-      if @socket && @socket.writable
+      if @socket? && @socket.writable
         @debug('connect#exists')
         resolve()
       else
@@ -71,7 +71,7 @@ module.exports = class Feedback extends EventEmitter
     @socket.destroy()
     delete @socket
 
-    clearInterval(@interval) if @interval
+    clearInterval(@interval) if @interval?
 
     if options.drop
       @debug("disconnect#drop")
@@ -114,12 +114,12 @@ module.exports = class Feedback extends EventEmitter
   startInterval: =>
     @debug('startInterval#start')
 
-    clearInterval(@interval)  if @interval
+    clearInterval(@interval)  if @interval?
     @interval = setInterval(
       =>
         @debug('startInterval#interval_start')
 
-        if @socket && !@socket.writable
+        if @socket? && !@socket.writable
           @disconnect(drop: true)
 
       @options.interval * 1000
