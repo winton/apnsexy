@@ -3,6 +3,7 @@ for key, value of require('./apnshit/common')
 
 Debug        = require './apnshit/debug'
 Feedback     = require './apnshit/feedback'
+Librato      = require './apnshit/librato'
 Notification = require './apnshit/notification'
 
 class Apnshit extends EventEmitter
@@ -16,6 +17,7 @@ class Apnshit extends EventEmitter
       debug_ignore: []
       gateway     : 'gateway.push.apple.com'
       key         : 'key.pem'
+      librato     : null
       passphrase  : null
       port        : 2195
       secure_cert : true
@@ -27,7 +29,8 @@ class Apnshit extends EventEmitter
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
-    new Debug(@)  if @options.debug
+    new Debug(@)    if @options.debug
+    new Librato(@)  if @options.librato
 
     @resetVars()
     @keepSending()
@@ -37,7 +40,7 @@ class Apnshit extends EventEmitter
 
     @stale_count ||= 0
 
-    if !@stale_index || @stale_index < @sent_index
+    if !@stale_index? || @stale_index < @sent_index
       @stale_index = @sent_index
       @stale_count = 0
 
@@ -45,16 +48,22 @@ class Apnshit extends EventEmitter
 
     if @stale_count >= 2
       clearInterval(@stale_connection_timer)
-      @resetVars()
-      
+
+      @potential_drops += @notifications.length - 1 - @sent_index
+      @debug('checkForStaleConnection#@potential_drops', @potential_drops)
+
       @debug('checkForStaleConnection#stale')
-      @emit('finish')
+      @emit('finish', @sent_index + 1, @potential_drops)
+      
+      @killSocket()
+      @resetVars()
 
   connect: ->
     @debug('connect#start')
 
-    unless @socket && @socket.writable
+    if !@connecting && (!@socket || !@socket.writable)
       delete @connect_promise
+      @connect_index = @index - 1
 
     @connect_promise ||= defer (resolve, reject) =>
       if @socket && @socket.writable
@@ -63,6 +72,8 @@ class Apnshit extends EventEmitter
       else
         @debug('connect#connecting')
         @resetVars(connecting: true)
+
+        @connecting    = true
         
         socket_options =
           ca                : @options.ca
@@ -80,6 +91,7 @@ class Apnshit extends EventEmitter
               socket_options
               =>
                 @debug("connect#connected")
+                @connecting = false
                 resolve()
             )
 
@@ -94,10 +106,6 @@ class Apnshit extends EventEmitter
             )
           10
         )
-
-  killSocket: ->
-    @socket.removeAllListeners()
-    @socket.writable = false
 
   enqueue: (notification) ->
     @debug("enqueue", notification)
@@ -121,21 +129,28 @@ class Apnshit extends EventEmitter
           @index = @error_index + 1
           delete @error_index
 
-        if !@sending && @index != @notifications.length
+        if @index != @notifications.length
           @send()
-        
+
         @keepSending()
     )
 
+  killSocket: ->
+    delete @connecting
+    @socket.removeAllListeners()
+    @socket.writable = false
+
   resetVars: (options = {})->
     unless options.connecting?
+      delete @connecting
       delete @error_index
       delete @stale_connection_timer
 
-      @index         = 0
-      @notifications = []
-      @sent_index    = 0
-      @uid           = 0
+      @index           = 0
+      @potential_drops = 0
+      @notifications   = []
+      @sent_index      = 0
+      @uid             = 0
 
     delete @stale_count
     delete @stale_index
@@ -146,9 +161,7 @@ class Apnshit extends EventEmitter
     if notification
       @debug('send#@index', @index)
 
-      index    = @index
-      @sending = true
-
+      index = @index
       @index++
 
       @debug("send#start", notification)
@@ -163,12 +176,10 @@ class Apnshit extends EventEmitter
               notification.encoding
               =>
                 @debug("send#written", notification)
+                @emit("sent", notification)
 
-                @sending    = false
                 @sent_index = index
             )
-          else
-            @sending = false
       )
 
   socketData: (data) ->
@@ -191,7 +202,7 @@ class Apnshit extends EventEmitter
       @debug('socketData#@error_index', @error_index)
       notification = @notifications[@error_index]
       
-      @debug('socketData#found_notification', notification)
+      @debug('socketData#found_notification', identifier, notification)
       @emit('error', notification)  if error_code == 8
 
       @killSocket()
@@ -199,8 +210,13 @@ class Apnshit extends EventEmitter
   socketError: (e) ->
     @debug('socketError#start', e)
 
-    @error_index = @sent_index + 1  unless @error_index?
-    @debug('socketError#@error_index', @error_index)
+    unless @error_index?
+      @error_index = @sent_index + 1
+      @debug('socketError#@error_index', @error_index)
+
+      @potential_drops += @error_index - @connect_index
+      @debug('socketError#@connect_index', @connect_index)
+      @debug('socketError#@potential_drops', @potential_drops)
 
     @killSocket()
 

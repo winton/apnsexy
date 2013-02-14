@@ -29,6 +29,8 @@ module.exports = class Debug extends EventEmitter
       )
       params = [ e, params ]
 
+    @instance.emit.apply(@instance, params)
+
     params.unshift('debug')
     @instance.emit.apply(@instance, params)
 
@@ -37,6 +39,7 @@ module.exports = class Debug extends EventEmitter
     if param.alert
       alert : param.alert
       device: param.device
+      uid   : param._uid
     else if param instanceof Error
       param
     else if typeof(param) == 'number'
