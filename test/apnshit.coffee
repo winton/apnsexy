@@ -79,9 +79,13 @@ describe 'Apnshit', ->
 
     describe '#enqueue()', ->
       it 'should send a notification', (done) ->
+        expected_finishes += 1
+
         n = notification()
+        
         apns.once 'finish', => done()
         apns.enqueue(n)
+        
         notifications.push(n)
 
   describe '#enqueue()', ->
@@ -131,10 +135,12 @@ describe 'Apnshit', ->
 
     if process.env.GOOD
       it 'should recover from error (mostly good)', (done) ->
+        expected_finishes += 1
         apns.once 'finish', => done()
         send('mostly good')
 
       it 'should send multiple (all good)', (done) ->
+        expected_finishes += 1
         apns.once 'finish', => done()
         send('all good')
 

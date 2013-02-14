@@ -52,11 +52,14 @@ class Apnshit extends EventEmitter
       @potential_drops += @notifications.length - 1 - @sent_index
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
 
-      @debug('checkForStaleConnection#stale')
-      @emit('finish', @sent_index + 1, @potential_drops)
-      
+      total_sent      = @sent_index + 1
+      potential_drops = @potential_drops
+
       @killSocket()
       @resetVars()
+
+      @debug('checkForStaleConnection#stale')
+      @emit('finish', @sent_index + 1, @potential_drops)
 
   connect: ->
     @debug('connect#start')
