@@ -22,7 +22,11 @@ expected_finishes = 0
 finishes          = 0
 good              = []
 notifications     = []
-sample            = process.env.SAMPLE || 5
+sample            = process.env.SAMPLE || 6
+
+if sample < 6
+  console.log "SAMPLE must be greater than 5"
+  process.exit()
 
 describe 'Apnshit', ->
 
@@ -35,8 +39,8 @@ describe 'Apnshit', ->
       debug         : true
       debug_ignore  : [
         'enqueue'
-        'connect#connecting'
-        'connect#connected'
+        #'connect#connecting'
+        #'connect#connected'
         'connect#start'
         'connect#exists'
         'send#start'
@@ -59,14 +63,14 @@ describe 'Apnshit', ->
       drops += drop_count
       finishes += 1
 
-      # console.log "sent", sent
-      # console.log "drop count", drop_count
-      # console.log "drops", drops
-      # console.log "expected drops", expected_drops
-      # console.log "finishes", finishes
-      # console.log "expected finishes", expected_finishes
-      # console.log "errors.length", errors.length
-      # console.log "expected errors", expected_errors
+      console.log "sent", sent
+      console.log "drop count", drop_count
+      console.log "drops", drops
+      console.log "expected drops", expected_drops
+      console.log "finishes", finishes
+      console.log "expected finishes", expected_finishes
+      console.log "errors.length", errors.length
+      console.log "expected errors", expected_errors
 
       drops.should.equal(expected_drops)
       errors.length.should.equal(expected_errors)
@@ -102,7 +106,7 @@ describe 'Apnshit', ->
 
       it "should recover from socket error mid-way through", (done) ->
         error_at           = Math.floor(sample / 2) - 1
-        expected_drops    += error_at
+        expected_drops    += error_at + 1
         expected_finishes += 1
         writes             = 0
 
@@ -111,24 +115,24 @@ describe 'Apnshit', ->
         expected_errors -= error_at
 
         apns.on 'sent', =>
-          writes++
           if writes == error_at
             apns.socket.destroy()
+          writes++
 
         apns.once 'finish', => done()
         send('mostly bad')
 
       it "should recover from socket error mid-way through (twice)", (done) ->
         error_at           = Math.floor(sample / 2) - 1
-        expected_drops    += error_at * 2 - 1
+        expected_drops    += error_at * 2
         expected_errors   -= error_at * 2 - 1
         expected_finishes += 1
         writes             = 0
 
         apns.on 'sent', =>
-          writes++
           if writes == error_at || writes == error_at * 2 - 1
             apns.socket.destroy()
+          writes++
 
         apns.once 'finish', => done()
         send('mostly bad')

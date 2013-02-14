@@ -59,13 +59,14 @@ class Apnshit extends EventEmitter
       @resetVars()
 
       @debug('checkForStaleConnection#stale')
-      @emit('finish', @sent_index + 1, @potential_drops)
+      @emit('finish', total_sent, potential_drops)
 
   connect: ->
     @debug('connect#start')
 
     if !@connecting && (!@socket || !@socket.writable)
       delete @connect_promise
+      delete @sent_index
       @connect_index = @index - 1
 
     @connect_promise ||= defer (resolve, reject) =>
@@ -178,10 +179,10 @@ class Apnshit extends EventEmitter
               notification.data()
               notification.encoding
               =>
+                @sent_index = index
+
                 @debug("send#written", notification)
                 @emit("sent", notification)
-
-                @sent_index = index
             )
       )
 
@@ -214,10 +215,10 @@ class Apnshit extends EventEmitter
     @debug('socketError#start', e)
 
     unless @error_index?
-      @error_index = @sent_index + 1
+      @error_index = @sent_index
       @debug('socketError#@error_index', @error_index)
 
-      @potential_drops += @error_index - @connect_index
+      @potential_drops += @error_index - @connect_index + 1
       @debug('socketError#@connect_index', @connect_index)
       @debug('socketError#@potential_drops', @potential_drops)
 

@@ -29,16 +29,15 @@ if process.env.FEEDBACK
       apns = new Apnshit(
         cert          : cert
         debug         : true
-        debug_ignore  : [ 'connect#start', 'send#start' ]
+        debug_ignore  : [ 'connect#start', 'keepSending', 'send#start' ]
         key           : cert
         gateway       : "gateway.push.apple.com"
-        resend_on_drop: true
       )
 
       apns.on 'debug', console.log
 
-      apns.send(notification("ee1a4015086fad0da5705bddc803233297f834fb5b5e55ca524421069fe44537"))
-      apns.send(notification("7a4be145692158ee5a1f275cccc7fd83fed7f744c9837f04c5db23e104bea391"))
+      apns.enqueue(notification("ee1a4015086fad0da5705bddc803233297f834fb5b5e55ca524421069fe44537"))
+      apns.enqueue(notification("7a4be145692158ee5a1f275cccc7fd83fed7f744c9837f04c5db23e104bea391"))
       apns.once 'finish', => done()
 
     describe 'feedback event', ->
