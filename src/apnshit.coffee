@@ -37,7 +37,7 @@ class Apnshit extends EventEmitter
 
     @stale_count ||= 0
 
-    if !@stale_index || @stale_index < @sent_index
+    if !@stale_index? || @stale_index < @sent_index
       @stale_index = @sent_index
       @stale_count = 0
 
@@ -53,11 +53,11 @@ class Apnshit extends EventEmitter
   connect: ->
     @debug('connect#start')
 
-    unless @socket && @socket.writable
+    unless @socket? && @socket.writable
       delete @connect_promise
 
     @connect_promise ||= defer (resolve, reject) =>
-      if @socket && @socket.writable
+      if @socket? && @socket.writable
         @debug('connect#exists')
         resolve()
       else
