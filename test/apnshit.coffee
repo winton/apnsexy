@@ -59,14 +59,14 @@ describe 'Apnshit', ->
       drops += drop_count
       finishes += 1
 
-      console.log "sent", sent
-      console.log "drop count", drop_count
-      console.log "drops", drops
-      console.log "expected drops", expected_drops
-      console.log "finishes", finishes
-      console.log "expected finishes", expected_finishes
-      console.log "errors.length", errors.length
-      console.log "expected errors", expected_errors
+      # console.log "sent", sent
+      # console.log "drop count", drop_count
+      # console.log "drops", drops
+      # console.log "expected drops", expected_drops
+      # console.log "finishes", finishes
+      # console.log "expected finishes", expected_finishes
+      # console.log "errors.length", errors.length
+      # console.log "expected errors", expected_errors
 
       drops.should.equal(expected_drops)
       errors.length.should.equal(expected_errors)
