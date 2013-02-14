@@ -158,7 +158,7 @@ class Apnshit extends EventEmitter
           @debug("send#write", notification)
           
           if @socket.writable
-            written = @socket.write(
+            @socket.write(
               notification.data()
               notification.encoding
               =>
@@ -167,8 +167,6 @@ class Apnshit extends EventEmitter
                 @sending    = false
                 @sent_index = index
             )
-            if !written?
-              @debug("send#write_failed")
           else
             @sending = false
       )
