@@ -5,7 +5,8 @@
 		"colors": "",
 		"glob": "",
 		"q": "",
-		"underscore": ""
+		"underscore": "",
+		"librato-metrics": ""
 	},
 	"devDependencies": {
 		"chai": "",
