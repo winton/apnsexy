@@ -23,6 +23,7 @@ finishes          = 0
 good              = []
 notifications     = []
 sample            = process.env.SAMPLE || 6
+sample            = parseInt(sample)
 
 if sample < 6
   console.log "SAMPLE must be greater than 5"
@@ -136,6 +137,18 @@ describe 'Apnshit', ->
 
         apns.once 'finish', => done()
         send('mostly bad')
+
+      it 'should timeout on failed connection', (done) ->
+        expected_drops    += sample
+        expected_errors   -= sample
+        expected_finishes += 1
+
+        # Stub out connection so it never connects
+        apns.connecting = true
+        apns.connect_promise = defer (resolve, reject) -> resolve()
+
+        apns.once 'finish', => done()
+        send('all bad')
 
     if process.env.GOOD
       it 'should recover from error (mostly good)', (done) ->

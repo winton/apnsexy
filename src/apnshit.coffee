@@ -40,7 +40,7 @@ class Apnshit extends EventEmitter
 
     @stale_count ||= 0
 
-    if !@stale_index? || @stale_index < @sent_index
+    if (!@stale_index? && @sent_index?) || @stale_index < @sent_index
       @stale_index = @sent_index
       @stale_count = 0
 
@@ -49,11 +49,11 @@ class Apnshit extends EventEmitter
     if @stale_count >= 2
       clearInterval(@stale_connection_timer)
 
-      @potential_drops += @notifications.length - 1 - @sent_index
+      @potential_drops += @notifications.length - (@sent_index + 1)
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
 
-      total_sent      = @sent_index + 1
-      potential_drops = @potential_drops
+      total_sent      = (@sent_index + 1)  || 0
+      potential_drops = (@potential_drops) || 0
 
       @killSocket()
       @resetVars()
@@ -141,8 +141,9 @@ class Apnshit extends EventEmitter
 
   killSocket: ->
     delete @connecting
-    @socket.removeAllListeners()
-    @socket.writable = false
+    if @socket?
+      @socket.removeAllListeners()
+      @socket.writable = false
 
   resetVars: (options = {})->
     unless options.connecting?
@@ -153,7 +154,7 @@ class Apnshit extends EventEmitter
       @index           = 0
       @potential_drops = 0
       @notifications   = []
-      @sent_index      = 0
+      @sent_index      = -1
       @uid             = 0
 
     delete @stale_count
