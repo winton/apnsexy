@@ -9,6 +9,7 @@ fs      = require('fs')
 _       = require('underscore')
 
 Apnshit = apnshit.Apnshit
+Librato = apnshit.Librato
 
 apns              = null
 bad               = []
@@ -21,6 +22,7 @@ expected_errors   = 0
 expected_finishes = 0
 finishes          = 0
 good              = []
+librato           = null
 notifications     = []
 sample            = process.env.SAMPLE || 6
 sample            = parseInt(sample)
@@ -32,8 +34,9 @@ if sample < 6
 describe 'Apnshit', ->
 
   before ->
-    config = fs.readFileSync("#{__dirname}/config.json")
-    config = JSON.parse(config)
+    config  = fs.readFileSync("#{__dirname}/config.json")
+    config  = JSON.parse(config)
+    librato = new Librato(config.librato)
 
     apns = new Apnshit(
       cert          : config.cert
@@ -52,7 +55,7 @@ describe 'Apnshit', ->
       ]
       key    : config.key
       gateway: "gateway.sandbox.push.apple.com"
-      librato: config.librato
+      librato: librato
     )
 
     apns.on 'debug', console.log
@@ -177,11 +180,7 @@ describe 'Apnshit', ->
       console.log("\n#{notifications.length} notifications:")
       console.log("\n#{notifications.join("\n")}")
 
-      # allow librato requests to finish
-      setTimeout(
-        => done()
-        1000
-      )
+      librato.on('finish', => done())
 
 send = (type) ->
   for i in [0..sample-1]

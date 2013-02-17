@@ -29,8 +29,8 @@ class Apnshit extends EventEmitter
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
-    new Debug(@)    if @options.debug
-    new Librato(@)  if @options.librato
+    new Debug(@)              if @options.debug
+    @options.librato.bind(@)  if @options.librato
 
     @resetVars()
     @keepSending()
@@ -228,4 +228,5 @@ class Apnshit extends EventEmitter
 module.exports = 
   Apnshit     : Apnshit
   Feedback    : Feedback
+  Librato     : Librato
   Notification: Notification
