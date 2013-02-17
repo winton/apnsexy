@@ -1,6 +1,6 @@
-apnshit      = require('../lib/apnshit')
+apnsexy      = require('../lib/apnsexy')
 fs           = require('fs')
-Notification = apnshit.Notification
+Notification = apnsexy.Notification
 
 config = fs.readFileSync("#{__dirname}/config.json")
 config = JSON.parse(config)

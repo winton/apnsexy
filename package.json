@@ -1,12 +1,12 @@
 {
-	"name": "apnshit",
+	"name": "apnsexy",
 	"version": "0.1.0",
 	"dependencies": {
 		"colors": "",
 		"glob": "",
+		"librato-metrics": "",
 		"q": "",
-		"underscore": "",
-		"librato-metrics": ""
+		"underscore": ""
 	},
 	"devDependencies": {
 		"chai": "",
@@ -14,8 +14,7 @@
 		"mocha": "",
 		"sinon": ""
 	},
-	"main": "./lib/apnshit",
-	"preferGlobal": "true",
+	"main": "./lib/apnsexy",
 	"scripts": {
 		"start": "coffee -o lib -cw src",
 		"test": "mocha test/test.js --reporter spec -t 1000000"

@@ -1,15 +1,15 @@
-for key, value of require('../lib/apnshit/common')
+for key, value of require('../lib/apnsexy/common')
   eval("var #{key} = value;")
 
 for key, value of require('./helpers')
   eval("var #{key} = value;")
 
-apnshit = require('../lib/apnshit')
+apnsexy = require('../lib/apnsexy')
 fs      = require('fs')
 _       = require('underscore')
 
-Apnshit = apnshit.Apnshit
-Librato = apnshit.Librato
+Apnsexy = apnsexy.Apnsexy
+Librato = apnsexy.Librato
 
 apns              = null
 bad               = []
@@ -31,14 +31,14 @@ if sample < 6
   console.log "SAMPLE must be greater than 5"
   process.exit()
 
-describe 'Apnshit', ->
+describe 'Apnsexy', ->
 
   before ->
     config  = fs.readFileSync("#{__dirname}/config.json")
     config  = JSON.parse(config)
     librato = new Librato(config.librato)
 
-    apns = new Apnshit(
+    apns = new Apnsexy(
       cert          : config.cert
       debug         : true
       debug_ignore  : [

@@ -1,16 +1,16 @@
-for key, value of require('../lib/apnshit/common')
+for key, value of require('../lib/apnsexy/common')
   eval("var #{key} = value;")
 
 for key, value of require('./helpers')
   eval("var #{key} = value;")
 
-apnshit = require('../lib/apnshit')
+apnsexy = require('../lib/apnsexy')
 fs      = require('fs')
 _       = require('underscore')
 
-Apnshit      = apnshit.Apnshit
-Feedback     = apnshit.Feedback
-Notification = apnshit.Notification
+Apnsexy      = apnsexy.Apnsexy
+Feedback     = apnsexy.Feedback
+Notification = apnsexy.Notification
 
 cert            = null
 config          = null
@@ -26,7 +26,7 @@ if process.env.FEEDBACK
 
       cert = "/Users/wintonwelsh/Sites/namtar/config/apns-production.pem"
 
-      apns = new Apnshit(
+      apns = new Apnsexy(
         cert          : cert
         debug         : true
         debug_ignore  : [ 'connect#start', 'keepSending', 'send#start' ]

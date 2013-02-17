@@ -1,12 +1,12 @@
-for key, value of require('./apnshit/common')
+for key, value of require('./apnsexy/common')
   eval("var #{key} = value;")
 
-Debug        = require './apnshit/debug'
-Feedback     = require './apnshit/feedback'
-Librato      = require './apnshit/librato'
-Notification = require './apnshit/notification'
+Debug        = require './apnsexy/debug'
+Feedback     = require './apnsexy/feedback'
+Librato      = require './apnsexy/librato'
+Notification = require './apnsexy/notification'
 
-class Apnshit extends EventEmitter
+class Apnsexy extends EventEmitter
   
   constructor: (options) ->
 
@@ -226,7 +226,7 @@ class Apnshit extends EventEmitter
     @killSocket()
 
 module.exports = 
-  Apnshit     : Apnshit
+  Apnsexy     : Apnsexy
   Feedback    : Feedback
   Librato     : Librato
   Notification: Notification
