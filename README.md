@@ -8,23 +8,24 @@ Test-driven APNS library with built-in metrics.
 
 ##Example (coffeescript)
 
-    apnsexy = require("apnsexy")
-    Apnsexy = apnsexy.Apnsexy
-    Librato = apnsexy.Librato
+    apnsexy      = require("apnsexy")
+    Apnsexy      = apnsexy.Apnsexy
+    Librato      = apnsexy.Librato
+    Notification = apnsexy.Notification
 
     # Librato Metrics
     librato = new Librato(
-      "email": "your@email.com",
-      "token": "yourtoken"
+      email: "your@email.com",
+      token: "yourtoken"
     )
 
     # Apnsexy
     apns = new Apnsexy(
-      cert          : "/path/to/cert.pem"
-      debug         : true
-      debug_ignore  : [ "keepSending" ]
-      gateway: "gateway.sandbox.push.apple.com"
-      librato: librato
+      cert        : "/path/to/cert.pem"
+      debug       : true
+      debug_ignore: [ "keepSending" ]
+      gateway     : "gateway.sandbox.push.apple.com"
+      librato     : librato
     )
 
     # Send notification

@@ -12,11 +12,11 @@ class Apnsexy extends EventEmitter
 
     @options = _.extend(
       ca          : null
-      cert        : 'cert.pem'
+      cert        : null
       debug       : false
       debug_ignore: []
       gateway     : 'gateway.push.apple.com'
-      key         : 'key.pem'
+      key         : options.cert
       librato     : null
       passphrase  : null
       port        : 2195
