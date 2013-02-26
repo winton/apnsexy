@@ -63,12 +63,12 @@ describe 'Apnsexy', ->
     apns.on 'error', (n) =>
       errors.push(n)
 
-    apns.on 'finish', (sent, drop_count) =>
-      drops += drop_count
+    apns.on 'finish', (counts) =>
+      drops += counts.potential_drops
       finishes += 1
 
-      console.log "sent", sent
-      console.log "drop count", drop_count
+      console.log "sent", counts.total_sent
+      console.log "drop count", counts.potential_drops
       console.log "drops", drops
       console.log "expected drops", expected_drops
       console.log "finishes", finishes

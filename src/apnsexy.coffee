@@ -52,14 +52,22 @@ class Apnsexy extends EventEmitter
       @potential_drops += @notifications.length - (@sent_index + 1)
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
 
-      total_sent      = (@sent_index + 1)  || 0
-      potential_drops = (@potential_drops) || 0
+      potential_drops     = @potential_drops
+      total_errors        = @errors
+      total_notifications = @notifications.length
+      total_sent          = @sent_index + 1
 
       @killSocket()
       @resetVars()
 
       @debug('checkForStaleConnection#stale')
-      @emit('finish', total_sent, potential_drops)
+      @emit(
+        'finish'
+        potential_drops    : potential_drops
+        total_errors       : total_errors
+        total_notifications: total_notifications
+        total_sent         : total_sent
+      )
 
   connect: ->
     @debug('connect#start')
@@ -151,6 +159,7 @@ class Apnsexy extends EventEmitter
       delete @error_index
       delete @stale_connection_timer
 
+      @errors          = 0
       @index           = 0
       @potential_drops = 0
       @notifications   = []
@@ -208,7 +217,10 @@ class Apnsexy extends EventEmitter
       notification = @notifications[@error_index]
       
       @debug('socketData#found_notification', identifier, notification)
-      @emit('error', notification)  if error_code == 8
+
+      if error_code == 8
+        @errors++
+        @emit('error', notification)
 
       @killSocket()
 

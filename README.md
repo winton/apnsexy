@@ -15,7 +15,7 @@ Test-driven APNS library with built-in metrics.
 
     # Librato Metrics
     librato = new Librato(
-      email: "your@email.com",
+      email: "your@email.com"
       token: "yourtoken"
     )
 
@@ -43,7 +43,7 @@ Test-driven APNS library with built-in metrics.
 
 Emits when an invalid token (error 8) is found.
 
-###finish(total_sent, potential_drops)
+###finish(potential_drops: 0, total_errors: 0, total_notifications: 0, total_sent: 0)
 
 Emits when there are not any notifications to be resent.
 
