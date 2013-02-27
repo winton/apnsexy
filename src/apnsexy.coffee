@@ -30,7 +30,7 @@ class Apnsexy extends EventEmitter
     @on('error', ->)
 
     new Debug(@)
-    @options.librato.bind(@)  if @options.librato
+    @options.librato.bindApnsexy(@)  if @options.librato
 
     @resetVars()
     @keepSending()

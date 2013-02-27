@@ -11,30 +11,31 @@ module.exports = class Librato extends EventEmitter
 
     setInterval(
       =>
-        gauges = {}
-
-        if @drops == 0 && @errors == 0 && @sent == 0 && @successes == 0
+        if (@drops + @errors + @feedback + @sent + @successes) == 0
           @emit('finish')
-
-        gauges.errors     = value: @errors
-        gauges.total_sent = value: @sent
-
-        @resetVars()
+          return
 
         @gauges(
-          gauges
+          errors    : value: @errors
+          feedback  : value: @feedback
+          total_sent: value: @sent
         ).fail(
           (e) => throw e
         ).fin(
           => @resetVars()
         )
+
+        @resetVars()
       10 * 1000
     )
 
-  bind: (instance) ->
+  bindApnsexy: (instance) ->
     instance.on('finish', @finish)
     instance.on('error' , => @errors++)
     instance.on('sent'  , => @sent++)
+
+  bindFeedback: (instance) ->
+    instance.on('feedback', => @feedback++)
 
   counters: (counters) ->
     @post(counters: counters)
@@ -70,5 +71,6 @@ module.exports = class Librato extends EventEmitter
   resetVars: ->
     @drops     = 0
     @errors    = 0
+    @feedback  = 0
     @sent      = 0
     @successes = 0

@@ -10,22 +10,24 @@ module.exports = class Feedback extends EventEmitter
     @options = _.extend(
       address     : "feedback.push.apple.com"
       ca          : null
-      cert        : "cert.pem"
+      cert        : null
       debug       : false
       debug_ignore: []
       interval    : 60
-      key         : "key.pem"
+      key         : options.cert
+      librato     : null
       passphrase  : null
       port        : 2196
       secure_cert : true
-
+      
       options
     )
 
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
-    new Debug(@)  if @options.debug
+    new Debug(@)
+    @options.librato.bindFeedback(@)  if @options.librato
 
     @connect().then(=> @startInterval())
 
@@ -39,6 +41,7 @@ module.exports = class Feedback extends EventEmitter
       else
         @debug('connect#connecting')
         @connecting = true
+        
         socket_options =
           ca                : @options.ca
           cert              : fs.readFileSync(@options.cert)

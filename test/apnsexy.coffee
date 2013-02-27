@@ -98,6 +98,8 @@ describe 'Apnsexy', ->
 
     describe '#enqueue()', ->
       it 'should send a notification', (done) ->
+        # pattern = [ 'good' ]
+
         expected_sent = 1
         expected_finishes++
 
@@ -110,6 +112,8 @@ describe 'Apnsexy', ->
   describe '#enqueue()', ->
     if process.env.BAD
       it 'should recover from failure (mostly bad)', (done) ->
+        # pattern = [ 'bad', 'good', 'bad', 'bad', 'good', 'bad' ]
+
         apns.once 'finish', => done()
         send('mostly bad')
 
@@ -117,6 +121,8 @@ describe 'Apnsexy', ->
         expected_finishes++
 
       it 'should recover from failure (all bad)', (done) ->
+        # pattern = [ 'bad', 'bad', 'bad', 'bad', 'bad', 'bad' ]
+
         apns.once 'finish', => done()
         send('all bad')
 
@@ -124,7 +130,7 @@ describe 'Apnsexy', ->
         expected_finishes++
 
       it "should recover from socket error mid-way through", (done) ->
-        # drop drop error bad good bad
+        # pattern = [ 'drop', 'drop', 'error', 'bad', 'good', 'bad' ]
 
         error_at = Math.floor(sample / 2) - 1
         writes   = 0
@@ -143,7 +149,7 @@ describe 'Apnsexy', ->
         send('mostly bad')
 
       it "should recover from socket error mid-way through (twice)", (done) ->
-        # drop drop error error good bad
+        # pattern = [ 'drop', 'drop', 'error', 'error', 'good', 'bad' ]
 
         error_at = Math.floor(sample / 2) - 1
         writes   = 0
@@ -162,9 +168,11 @@ describe 'Apnsexy', ->
         send('mostly bad')
 
       it 'should timeout on failed connection', (done) ->
-        expected_drops    += sample
-        expected_errors   -= sample
-        expected_sent      = 0
+        # pattern = [ 'bad', 'bad', 'bad', 'bad', 'bad', 'bad' ]
+
+        expected_drops  += sample
+        expected_errors -= sample
+        expected_sent    = 0
         expected_finishes++
 
         # Stub out connection so it never connects
@@ -176,6 +184,8 @@ describe 'Apnsexy', ->
 
     if process.env.GOOD
       it 'should recover from error (mostly good)', (done) ->
+        # pattern = [ 'good', 'bad', 'good', 'good', 'bad', 'good' ]
+
         apns.once 'finish', => done()
         send('mostly good')
 
@@ -183,6 +193,8 @@ describe 'Apnsexy', ->
         expected_finishes++
 
       it 'should send multiple (all good)', (done) ->
+        # pattern = [ 'good', 'good', 'good', 'good', 'good', 'good' ]
+
         apns.once 'finish', => done()
         send('all good')
 
