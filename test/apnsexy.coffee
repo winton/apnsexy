@@ -33,6 +33,15 @@ if sample < 6
 
 describe 'Apnsexy', ->
 
+  beforeEach ->
+    drops    = 0
+    errors   = []
+    finishes = 0
+
+    expected_drops    = 0
+    expected_errors   = 0
+    expected_finishes = 0
+
   before ->
     config  = fs.readFileSync("#{__dirname}/config.json")
     config  = JSON.parse(config)
@@ -43,7 +52,7 @@ describe 'Apnsexy', ->
       debug         : true
       debug_ignore  : [
         'enqueue'
-        #'connect#connecting'
+        'connect#connecting'
         #'connect#connected'
         'connect#start'
         'connect#exists'
@@ -98,21 +107,25 @@ describe 'Apnsexy', ->
 
   describe '#enqueue()', ->
     if process.env.BAD
-      it 'should recover from failure (mostly bad)', (done) ->
-        expected_finishes += 1
-        apns.once 'finish', => done()
-        send('mostly bad')
+      # it 'should recover from failure (mostly bad)', (done) ->
+      #   expected_finishes += 1
+      #   apns.once 'finish', => done()
+      #   send('mostly bad')
 
-      it 'should recover from failure (all bad)', (done) ->
-        expected_finishes += 1
-        apns.once 'finish', => done()
-        send('all bad')
+      # it 'should recover from failure (all bad)', (done) ->
+      #   expected_finishes += 1
+      #   apns.once 'finish', => done()
+      #   send('all bad')
 
       it "should recover from socket error mid-way through", (done) ->
+        # drop drop error bad good bad
+
         error_at           = Math.floor(sample / 2) - 1
         expected_drops    += error_at + 1
         expected_finishes += 1
         writes             = 0
+
+        console.log("ERROR AT", error_at)
 
         # The drops will not trigger an error event as normally expected.
         # We need to decrement those drops from the expected errors variable.
@@ -120,6 +133,7 @@ describe 'Apnsexy', ->
 
         apns.on 'sent', =>
           if writes == error_at
+            console.log("BOOM")
             apns.socket.destroy()
           writes++
 
@@ -127,14 +141,20 @@ describe 'Apnsexy', ->
         send('mostly bad')
 
       it "should recover from socket error mid-way through (twice)", (done) ->
+        # drop drop error error good bad
+
         error_at           = Math.floor(sample / 2) - 1
         expected_drops    += error_at * 2
         expected_errors   -= error_at * 2 - 1
         expected_finishes += 1
         writes             = 0
 
+        console.log("ERROR AT", error_at)
+        console.log("ERROR AT", error_at * 2 - 1)
+
         apns.on 'sent', =>
           if writes == error_at || writes == error_at * 2 - 1
+            console.log("BOOM")
             apns.socket.destroy()
           writes++
 
@@ -168,17 +188,19 @@ describe 'Apnsexy', ->
     it 'should have sent these notifications', (done) ->
       console.log('')
 
-      notifications = _.map notifications, (n) =>
-        n.alert.replace(/\D+/g, '')
+      # notifications = _.map notifications, (n) =>
+      #   console.log("&&&", n)
+      #   n.alert.replace(/\D+/g, '')
 
-      errors = _.map errors, (n) =>
-        n.alert.replace(/\D+/g, '')
+      # errors = _.map errors, (n) =>
+      #   console.log(n)
+      #   n.alert.replace(/\D+/g, '')
 
       console.log("\nsample size: #{sample}")
       console.log("\ndrops: #{drops}")
       console.log("\n#{errors.length} errors / #{expected_errors} expected")
-      console.log("\n#{notifications.length} notifications:")
-      console.log("\n#{notifications.join("\n")}")
+      # console.log("\n#{notifications.length} notifications:")
+      # console.log("\n#{notifications.join("\n")}")
 
       librato.on('finish', => done())
 

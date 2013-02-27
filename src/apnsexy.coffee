@@ -50,12 +50,24 @@ class Apnsexy extends EventEmitter
       clearInterval(@stale_connection_timer)
 
       @potential_drops += @notifications.length - (@sent_index + 1)
+
+      console.log('!!! @sent_index', @sent_index)
+      console.log('!!! @last_error_index', @last_error_index)
+      console.log('!!! @connect_index', @connect_index)
+
+      if @last_error_index > @connect_index && @sent_index >= @last_error_index
+        @sent += @sent_index - @last_error_index
+      else if @sent_index >= @connect_index
+        @sent += @sent_index - @connect_index
+
+      console.log('!!! @sent', @sent)
+
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
 
       potential_drops     = @potential_drops
       total_errors        = @errors
       total_notifications = @notifications.length
-      total_sent          = @sent_index + 1
+      total_sent          = @sent
 
       @killSocket()
       @resetVars()
@@ -75,7 +87,9 @@ class Apnsexy extends EventEmitter
     if !@connecting? && (!@socket? || !@socket.writable)
       delete @connect_promise
       delete @sent_index
+      
       @connect_index = @index - 1
+      @connect_index = -1  if @connect_index < -1
 
     @connect_promise ||= defer (resolve, reject) =>
       if @socket? && @socket.writable
@@ -138,10 +152,10 @@ class Apnsexy extends EventEmitter
         @debug("keepSending")
         
         if @error_index?
-          @index = @error_index + 1
+          @index = @error_index
           delete @error_index
 
-        if @index != @notifications.length
+        if @index < @notifications.length - 1
           @send()
 
         @keepSending()
@@ -157,39 +171,45 @@ class Apnsexy extends EventEmitter
     unless options.connecting?
       delete @connecting
       delete @error_index
+      delete @last_error_index
       delete @stale_connection_timer
 
       @errors          = 0
-      @index           = 0
+      @index           = -1
       @potential_drops = 0
       @notifications   = []
       @sent_index      = -1
+      @sent            = 0
       @uid             = 0
 
     delete @stale_count
     delete @stale_index
 
   send: ->
-    notification = @notifications[@index]
+    @debug('send#@index', @index + 1)
+
+    notification = @notifications[@index + 1]
 
     if notification
-      @debug('send#@index', @index)
-
-      index = @index
-      @index++
-
       @debug("send#start", notification)
+      @index++
+      index = @index
+
+      console.log("### @index", @index)
+      console.log("### index", index)
       
       @connect().then(
         =>
-          @debug("send#write", notification)
-          
           if @socket.writable
+            @debug("send#write", notification)
+
             @socket.write(
               notification.data()
               notification.encoding
               =>
                 @sent_index = index
+
+                console.log("@sent_index = #{index}")
 
                 @debug("send#written", notification)
                 @emit("sent", notification)
@@ -214,8 +234,16 @@ class Apnsexy extends EventEmitter
     
     if @error_index?
       @debug('socketData#@error_index', @error_index)
-      notification = @notifications[@error_index]
-      
+
+      notification      = @notifications[@error_index]
+      @last_error_index = @error_index
+      @sent            += (@error_index - 1) - @connect_index
+
+      console.log('!!! @error_index', @error_index)
+      console.log('!!! @connect_index', @connect_index)
+      console.log('!!! (@error_index - 1) - @connect_index', (@error_index - 1) - @connect_index)
+      console.log('!!! @sent', @sent)
+
       @debug('socketData#found_notification', identifier, notification)
 
       if error_code == 8
@@ -231,7 +259,9 @@ class Apnsexy extends EventEmitter
       @error_index = @sent_index
       @debug('socketError#@error_index', @error_index)
 
-      @potential_drops += @error_index - @connect_index + 1
+      @potential_drops += @error_index - @connect_index
+      @connect_index    = @error_index
+
       @debug('socketError#@connect_index', @connect_index)
       @debug('socketError#@potential_drops', @potential_drops)
 

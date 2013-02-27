@@ -13,12 +13,11 @@ module.exports = class Librato extends EventEmitter
       =>
         gauges = {}
 
-        if @sent == 0 && @drops == 0 && @errors == 0
+        if @drops == 0 && @errors == 0 && @sent == 0 && @successes == 0
           @emit('finish')
 
-        gauges.alerts_sent     = value: @sent
-        gauges.errors          = value: @errors
-        gauges.potential_drops = value: @drops
+        gauges.errors     = value: @errors
+        gauges.total_sent = value: @sent
 
         @resetVars()
 
@@ -41,11 +40,14 @@ module.exports = class Librato extends EventEmitter
     @post(counters: counters)
 
   finish: (counts) =>
-    @drops = counts.potential_drops
+    @drops     = counts.potential_drops
+    @successes = counts.total_sent
 
     @gauges(
-      drop_pct : value: @drops / counts.total_notifications
-      error_pct: value: counts.total_errors / counts.total_notifications
+      drop_pct       : value: @drops / counts.total_notifications
+      error_pct      : value: counts.total_errors / counts.total_notifications
+      potential_drops: value: @drops
+      successes      : value: @successes
     ).fail(
       (e) => throw e
     )
@@ -54,6 +56,7 @@ module.exports = class Librato extends EventEmitter
     @post(gauges: gauges)
 
   post: (data) ->
+    console.log(data)
     defer (resolve, reject) =>
       @metrics.post(
         '/metrics'
@@ -66,6 +69,7 @@ module.exports = class Librato extends EventEmitter
       )
 
   resetVars: ->
-    @drops   = 0
-    @errors  = 0
-    @sent    = 0
+    @drops     = 0
+    @errors    = 0
+    @sent      = 0
+    @successes = 0
