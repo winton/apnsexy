@@ -37,7 +37,7 @@ module.exports = class Debug extends EventEmitter
 
   extractInfo: (param) ->
     return  unless param?
-    if param.alert
+    if param.device
       alert : param.alert
       device: param.device
       uid   : param._uid
