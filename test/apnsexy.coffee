@@ -62,7 +62,6 @@ describe 'Apnsexy', ->
         'keepSending'
         'send#write'
         'send#written'
-        'socketData#start'
       ]
       key    : config.key
       gateway: "gateway.sandbox.push.apple.com"

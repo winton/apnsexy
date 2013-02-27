@@ -57,6 +57,7 @@ class Apnsexy extends EventEmitter
         @sent += @sent_index - @connect_index
 
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
+      @debug('checkForStaleConnection#@sent', @sent)
 
       potential_drops     = @potential_drops
       total_errors        = @errors

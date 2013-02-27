@@ -41,7 +41,5 @@ module.exports = class Debug extends EventEmitter
       alert : param.alert
       device: param.device
       uid   : param._uid
-    else if param instanceof Error
+    else
       param
-    else if typeof(param) == 'number'
-      param + ''
