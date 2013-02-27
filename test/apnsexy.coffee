@@ -20,12 +20,14 @@ errors            = []
 expected_drops    = 0
 expected_errors   = 0
 expected_finishes = 0
+expected_sent     = 0
 finishes          = 0
 good              = []
 librato           = null
 notifications     = []
 sample            = process.env.SAMPLE || 6
 sample            = parseInt(sample)
+sent              = 0
 
 if sample < 6
   console.log "SAMPLE must be greater than 5"
@@ -34,13 +36,15 @@ if sample < 6
 describe 'Apnsexy', ->
 
   beforeEach ->
-    drops    = 0
-    errors   = []
-    finishes = 0
+    bad    = []
+    drops  = 0
+    errors = []
+    good   = []
+    sent   = 0
 
-    expected_drops    = 0
-    expected_errors   = 0
-    expected_finishes = 0
+    expected_drops  = 0
+    expected_errors = 0
+    expected_sent   = 0
 
   before ->
     config  = fs.readFileSync("#{__dirname}/config.json")
@@ -73,21 +77,22 @@ describe 'Apnsexy', ->
       errors.push(n)
 
     apns.on 'finish', (counts) =>
-      drops += counts.potential_drops
+      drops     = counts.potential_drops
+      sent      = counts.total_sent
       finishes += 1
 
-      console.log "sent", counts.total_sent
-      console.log "drop count", counts.potential_drops
-      console.log "drops", drops
-      console.log "expected drops", expected_drops
-      console.log "finishes", finishes
-      console.log "expected finishes", expected_finishes
-      console.log "errors.length", errors.length
-      console.log "expected errors", expected_errors
+      console.log "\n"
+      console.log    "         (actual / expected)"
+      console.log "sent    :", "#{sent} / #{expected_sent}"
+      console.log "drops   :", "#{drops} / #{expected_drops}"
+      console.log "finishes:", "#{finishes} / #{expected_finishes}"
+      console.log "errors  :", "#{errors.length} / #{expected_errors}"
+      console.log "\n"
 
       drops.should.equal(expected_drops)
       errors.length.should.equal(expected_errors)
       finishes.should.equal(expected_finishes)
+      sent.should.equal(expected_sent)
 
   if process.env.GOOD
     describe '#connect()', ->
@@ -96,44 +101,44 @@ describe 'Apnsexy', ->
 
     describe '#enqueue()', ->
       it 'should send a notification', (done) ->
-        expected_finishes += 1
+        expected_sent = 1
+        expected_finishes++
 
         n = notification()
+        notifications.push(n)
         
         apns.once 'finish', => done()
         apns.enqueue(n)
-        
-        notifications.push(n)
 
   describe '#enqueue()', ->
     if process.env.BAD
-      # it 'should recover from failure (mostly bad)', (done) ->
-      #   expected_finishes += 1
-      #   apns.once 'finish', => done()
-      #   send('mostly bad')
+      it 'should recover from failure (mostly bad)', (done) ->
+        apns.once 'finish', => done()
+        send('mostly bad')
 
-      # it 'should recover from failure (all bad)', (done) ->
-      #   expected_finishes += 1
-      #   apns.once 'finish', => done()
-      #   send('all bad')
+        expected_sent = good.length
+        expected_finishes++
+
+      it 'should recover from failure (all bad)', (done) ->
+        apns.once 'finish', => done()
+        send('all bad')
+
+        expected_sent = good.length
+        expected_finishes++
 
       it "should recover from socket error mid-way through", (done) ->
         # drop drop error bad good bad
 
-        error_at           = Math.floor(sample / 2) - 1
-        expected_drops    += error_at + 1
-        expected_finishes += 1
-        writes             = 0
+        error_at = Math.floor(sample / 2) - 1
+        writes   = 0
 
-        console.log("ERROR AT", error_at)
-
-        # The drops will not trigger an error event as normally expected.
-        # We need to decrement those drops from the expected errors variable.
+        expected_drops   = error_at + 1
         expected_errors -= error_at
+        expected_sent    = 1
+        expected_finishes++
 
         apns.on 'sent', =>
           if writes == error_at
-            console.log("BOOM")
             apns.socket.destroy()
           writes++
 
@@ -143,18 +148,16 @@ describe 'Apnsexy', ->
       it "should recover from socket error mid-way through (twice)", (done) ->
         # drop drop error error good bad
 
-        error_at           = Math.floor(sample / 2) - 1
-        expected_drops    += error_at * 2
-        expected_errors   -= error_at * 2 - 1
-        expected_finishes += 1
-        writes             = 0
+        error_at = Math.floor(sample / 2) - 1
+        writes   = 0
 
-        console.log("ERROR AT", error_at)
-        console.log("ERROR AT", error_at * 2 - 1)
+        expected_drops   = error_at * 2
+        expected_errors -= error_at * 2 - 1
+        expected_sent    = 1
+        expected_finishes++
 
         apns.on 'sent', =>
           if writes == error_at || writes == error_at * 2 - 1
-            console.log("BOOM")
             apns.socket.destroy()
           writes++
 
@@ -164,7 +167,8 @@ describe 'Apnsexy', ->
       it 'should timeout on failed connection', (done) ->
         expected_drops    += sample
         expected_errors   -= sample
-        expected_finishes += 1
+        expected_sent      = 0
+        expected_finishes++
 
         # Stub out connection so it never connects
         apns.connecting = true
@@ -175,32 +179,28 @@ describe 'Apnsexy', ->
 
     if process.env.GOOD
       it 'should recover from error (mostly good)', (done) ->
-        expected_finishes += 1
         apns.once 'finish', => done()
         send('mostly good')
 
+        expected_sent = good.length
+        expected_finishes++
+
       it 'should send multiple (all good)', (done) ->
-        expected_finishes += 1
         apns.once 'finish', => done()
         send('all good')
+
+        expected_sent = good.length
+        expected_finishes++
 
   describe 'verify notifications', ->
     it 'should have sent these notifications', (done) ->
       console.log('')
 
-      # notifications = _.map notifications, (n) =>
-      #   console.log("&&&", n)
-      #   n.alert.replace(/\D+/g, '')
+      ns = _.map notifications, (n) =>
+        n.alert.replace(/\D+/g, '')
 
-      # errors = _.map errors, (n) =>
-      #   console.log(n)
-      #   n.alert.replace(/\D+/g, '')
-
-      console.log("\nsample size: #{sample}")
-      console.log("\ndrops: #{drops}")
-      console.log("\n#{errors.length} errors / #{expected_errors} expected")
-      # console.log("\n#{notifications.length} notifications:")
-      # console.log("\n#{notifications.join("\n")}")
+      console.log("\n#{ns.length} notifications:")
+      console.log("\n#{ns.join("\n")}")
 
       librato.on('finish', => done())
 

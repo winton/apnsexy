@@ -56,7 +56,6 @@ module.exports = class Librato extends EventEmitter
     @post(gauges: gauges)
 
   post: (data) ->
-    console.log(data)
     defer (resolve, reject) =>
       @metrics.post(
         '/metrics'

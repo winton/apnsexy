@@ -25,7 +25,18 @@ module.exports =
 
     noti
 
-device_ids = [
+shuffle = (a...) ->
+  i = a.length
+
+  while i
+    j    = parseInt(Math.random() * i)
+    x    = a[--i]
+    a[i] = a[j]
+    a[j] = x
+
+  a
+
+device_ids = shuffle(
   "7b3640bd9953174ea30e1952718405a4b1c0d0a1c9b8ad42fb2ce1140fe6b425"
   "a8718c4cd55b44e582b49b41eb21b22f988b864d257da8991bcf672e5ff3fc7d"
   "20a0fafabcb92642a14fac7a47aafcc8caca019b591a9ebb0bbff2fd6a3c379c"
@@ -126,4 +137,4 @@ device_ids = [
   "c5b6f9ea2e7859ca0ae106d6e91ca80c85c2b258012ba2dc43885a0a4a999863"
   "afd32ffff6e0644d8365a14fd172428ceaac58ec708f6ad64850a01b98ed18a6"
   "0bdbf988fa7f88dc45c58b50e02d0b954b03afb5fd9908ecf7440b5990d4a0da"
-]
+)

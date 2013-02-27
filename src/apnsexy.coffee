@@ -51,16 +51,10 @@ class Apnsexy extends EventEmitter
 
       @potential_drops += @notifications.length - (@sent_index + 1)
 
-      console.log('!!! @sent_index', @sent_index)
-      console.log('!!! @last_error_index', @last_error_index)
-      console.log('!!! @connect_index', @connect_index)
-
       if @last_error_index > @connect_index && @sent_index >= @last_error_index
         @sent += @sent_index - @last_error_index
       else if @sent_index >= @connect_index
         @sent += @sent_index - @connect_index
-
-      console.log('!!! @sent', @sent)
 
       @debug('checkForStaleConnection#@potential_drops', @potential_drops)
 
@@ -194,9 +188,6 @@ class Apnsexy extends EventEmitter
       @debug("send#start", notification)
       @index++
       index = @index
-
-      console.log("### @index", @index)
-      console.log("### index", index)
       
       @connect().then(
         =>
@@ -208,8 +199,6 @@ class Apnsexy extends EventEmitter
               notification.encoding
               =>
                 @sent_index = index
-
-                console.log("@sent_index = #{index}")
 
                 @debug("send#written", notification)
                 @emit("sent", notification)
@@ -238,11 +227,6 @@ class Apnsexy extends EventEmitter
       notification      = @notifications[@error_index]
       @last_error_index = @error_index
       @sent            += (@error_index - 1) - @connect_index
-
-      console.log('!!! @error_index', @error_index)
-      console.log('!!! @connect_index', @connect_index)
-      console.log('!!! (@error_index - 1) - @connect_index', (@error_index - 1) - @connect_index)
-      console.log('!!! @sent', @sent)
 
       @debug('socketData#found_notification', identifier, notification)
 
