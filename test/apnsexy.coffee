@@ -13,8 +13,6 @@ Librato = apnsexy.Librato
 
 apns              = null
 bad               = []
-config            = null
-device_id         = null
 drops             = 0
 errors            = []
 expected_drops    = 0
@@ -53,11 +51,11 @@ describe 'Apnsexy', ->
 
     apns = new Apnsexy(
       cert          : config.cert
-      debug         : true
+      debug         : false
       debug_ignore  : [
         'enqueue'
         'connect#connecting'
-        #'connect#connected'
+        'connect#connected'
         'connect#start'
         'connect#exists'
         'send#start'
@@ -83,10 +81,10 @@ describe 'Apnsexy', ->
 
       console.log "\n"
       console.log    "         (actual / expected)"
-      console.log "sent    :", "#{sent} / #{expected_sent}"
       console.log "drops   :", "#{drops} / #{expected_drops}"
-      console.log "finishes:", "#{finishes} / #{expected_finishes}"
       console.log "errors  :", "#{errors.length} / #{expected_errors}"
+      console.log "finishes:", "#{finishes} / #{expected_finishes}"
+      console.log "sent    :", "#{sent} / #{expected_sent}"
       console.log "\n"
 
       drops.should.equal(expected_drops)

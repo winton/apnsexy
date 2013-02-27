@@ -13,6 +13,7 @@ module.exports = class Debug extends EventEmitter
   debug: (e, params...) =>
     @events.push(e)  unless @events.indexOf(e) > -1
 
+    return  unless @instance.options.debug
     return  if @instance.options.debug_ignore.indexOf(e) > -1
 
     if params instanceof Array

@@ -29,7 +29,7 @@ class Apnsexy extends EventEmitter
     # EventEmitter requires something bound to error event
     @on('error', ->)
 
-    new Debug(@)              if @options.debug
+    new Debug(@)
     @options.librato.bind(@)  if @options.librato
 
     @resetVars()
