@@ -131,16 +131,15 @@ class Apnsexy extends EventEmitter
   enqueue: (notification) ->
     @debug("enqueue", notification)
 
-    @uid = 0  if @uid > 0xffffffff
-    notification._uid = @uid++
-    
-    if Array.isArray(notification)
-      _.each(notification,
-        (n) =>
-          @notifications.push(n)
-      )
-    else
-      @notifications.push(notification)
+    if !Array.isArray(notification)
+      notification = [ notification ]
+
+    _.each(notification,
+      (n) =>
+        @uid = 0  if @uid > 0xffffffff
+        n._uid = @uid++
+        @notifications.push(n)
+    )
 
     @stale_connection_timer ||= setInterval(
       => @checkForStaleConnection()
