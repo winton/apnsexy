@@ -134,7 +134,13 @@ class Apnsexy extends EventEmitter
     @uid = 0  if @uid > 0xffffffff
     notification._uid = @uid++
     
-    @notifications.push(notification)
+    if Array.isArray(notification)
+      _.each(notification,
+        (n) =>
+          @notifications.push(n)
+      )
+    else
+      @notifications.push(notification)
 
     @stale_connection_timer ||= setInterval(
       => @checkForStaleConnection()
