@@ -145,7 +145,7 @@ class Apnsexy extends EventEmitter
       => @checkForStaleConnection()
       @options.timeout
     )
-    defer(resolve,reject) =>
+    defer (resolve,reject) =>
       @once('finish',
         =>
           resolve()
