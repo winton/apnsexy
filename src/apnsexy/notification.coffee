@@ -19,8 +19,6 @@ module.exports = class Notification
 
     data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
 
-    data.on('error',->console.log)
-
     data[position] = 1
     position++
     data.writeUInt32BE @_uid, position
