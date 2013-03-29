@@ -153,7 +153,7 @@ class Apnsexy extends EventEmitter
 
 
   keepSending: ->
-    process.nextTick(
+    setImmediate(
       =>
         @debug("keepSending")
         
