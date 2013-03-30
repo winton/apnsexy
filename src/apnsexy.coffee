@@ -171,6 +171,7 @@ class Apnsexy extends EventEmitter
     delete @connecting
     if @socket?
       @socket.removeAllListeners()
+      @socket.on "error", (e) => @socketError(e)
       @socket.writable = false
 
   resetVars: (options = {})->
