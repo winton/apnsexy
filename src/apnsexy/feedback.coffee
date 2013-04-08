@@ -48,7 +48,6 @@ module.exports = class Feedback extends EventEmitter
           key               : fs.readFileSync(@options.key)
           passphrase        : @options.passphrase
           rejectUnauthorized: @options.secure_cert
-          socket            : new net.Stream()
 
         @socket = tls.connect(
           @options.port
