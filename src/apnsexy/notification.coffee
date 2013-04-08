@@ -18,6 +18,7 @@ module.exports = class Notification
     token          = new Buffer(@device.replace(/\s/g, ""), "hex")
 
     data = new Buffer(1 + 4 + 4 + 2 + token.length + 2 + message_length)
+
     data[position] = 1
     position++
     data.writeUInt32BE @_uid, position
@@ -44,5 +45,7 @@ module.exports = class Notification
     @payload.aps.badge = @badge  if @badge?
     @payload.aps.sound = @sound  if @sound?
     @payload.aps.alert = @alert  if @alert?
+    @payload.tag       = @tag    if @tag?
+    @payload.a         = @a      if @a?
     @payload.aps["content-available"] = 1  if @newsstandAvailable?
     @payload

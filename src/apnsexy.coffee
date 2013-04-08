@@ -131,18 +131,29 @@ class Apnsexy extends EventEmitter
   enqueue: (notification) ->
     @debug("enqueue", notification)
 
-    @uid = 0  if @uid > 0xffffffff
-    notification._uid = @uid++
-    
-    @notifications.push(notification)
+    if !Array.isArray(notification)
+      notification = [ notification ]
+
+    _.each(notification,
+      (n) =>
+        @uid = 0  if @uid > 0xffffffff
+        n._uid = @uid++
+        @notifications.push(n)
+    )
 
     @stale_connection_timer ||= setInterval(
       => @checkForStaleConnection()
       @options.timeout
     )
+    defer (resolve,reject) =>
+      @once('finish',
+        =>
+          resolve()
+      )
+
 
   keepSending: ->
-    process.nextTick(
+    setImmediate(
       =>
         @debug("keepSending")
         
@@ -160,6 +171,7 @@ class Apnsexy extends EventEmitter
     delete @connecting
     if @socket?
       @socket.removeAllListeners()
+      @socket.on "error", (e) => @socketError(e)
       @socket.writable = false
 
   resetVars: (options = {})->
